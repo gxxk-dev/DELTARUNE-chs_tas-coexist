@@ -1,0 +1,30 @@
+# Local game/mod assets and generated build output.
+/build/
+/output/
+/backups/
+/work/
+/latest_backup.txt
+
+# Generated verification dumps. Keep compact .tsv reports and code lists tracked.
+/verify/**/*.gml
+
+# .NET build output.
+**/bin/
+**/obj/
+
+# Logs and local machine files.
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Binary game/mod assets should not be published in this research repo.
+*.win
+*.bps
+*.xdelta
+*.mp4
+*.exe
+*.dll
+*.ttf
+*.otf

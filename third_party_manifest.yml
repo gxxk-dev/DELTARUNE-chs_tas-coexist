@@ -1,0 +1,47 @@
+assets:
+  deltarune:
+    description: "正版 DELTARUNE full game installation. Not redistributed."
+    required_files:
+      - data.win
+      - chapter1_windows/data.win
+      - chapter2_windows/data.win
+      - chapter3_windows/data.win
+      - chapter4_windows/data.win
+      - chapter5_windows/data.win
+    env: DELTARUNE_GAME_DIR
+
+  keucher_tas_mod:
+    version: "v5.10.5"
+    description: "Keucher/TAS Mod patch package. Not redistributed."
+    env: KEUCHER_MOD_DIR
+    sha256:
+      patch_files/ch5_latest-chapter_select.bps: "328f7ba64ac3b85e62383015f00930d4d5a0ff8d5a5b7fa3deb64249f4891590"
+      patch_files/ch5_latest-chapter1.bps: "3840d43c0615ebf4ea124c3eab42251ff52f4553eaed49c2a9a2d2504ce249a3"
+      patch_files/ch5_latest-chapter2.bps: "7a8f7e1e4faf0a28373ca8d6ed91aae1f1310d341af3f983560840cb5e315657"
+      patch_files/ch5_latest-chapter3.bps: "7225ddc3b5322da2c86d60ff4c64f0d42b0d5ae08af81caf98f640dde0f2f075"
+      patch_files/ch5_latest-chapter4.bps: "8d7214d79e6f4d59424092c7076614b132cffaf22fb452919dcd393be94a866d"
+      patch_files/ch5_latest-chapter5.bps: "310ee1028c609d854d8816187cfad4e0c16b79b44b55d964e807465c947d218e"
+
+  deltarune_chinese_source:
+    repository: "https://github.com/gm3dr/DeltaruneChinese.git"
+    commit: "a43a1ec74d2af9a63d6fddc97b8fef708a1a941f"
+    env: DELTARUNE_CHINESE_DIR
+
+  chs_release_data:
+    description: "CHS release package with xdelta, lang, and vid files. Not redistributed."
+    env: CHS_RELEASE_DIR
+    sha256:
+      main.xdelta: "b769a848b3adc0cf22d39bcf8c1f014782f9c4f4d0d20a2810f284d12d3ff727"
+      chapter1.xdelta: "db2af8926cbe372c94a53dcaac894c2b822632d86fda8f6a43bd2fd17e909f84"
+      chapter2.xdelta: "40b1eb028da3f32e928e8d2438d9bada771c5492dc414f775c17770c04ba0840"
+      chapter3.xdelta: "5e641eb9f824dc72aaa15a37d7891303dac2d9deefe6e151a3b038c4ff6f5184"
+      chapter4.xdelta: "98e1f7ef1c7d37fcc83acd804f2ad27b29107ee2d0285fe71be57f4db669b50c"
+
+outputs:
+  final_build_sha256:
+    output/data.win: "1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954"
+    output/chapter1_windows/data.win: "b45e1555a96cc82be8200315716b5de3bfcd41acb0eac85407415fd2aa42b31d"
+    output/chapter2_windows/data.win: "ea86de7e44ce1c557fa5599346d3372d5c39114e26ef30ed25928580673ea343"
+    output/chapter3_windows/data.win: "a16f79336d2c7d981c1d89842efde2493aae03a5d38ff263514fde5de587c609"
+    output/chapter4_windows/data.win: "15ffd455c030fd4beb60e5971b6fb220f49fb88124f4e344a9e6b039369c302b"
+    output/chapter5_windows/data.win: "31a6d51050a10143a2f9842043c9e20b87577332de0fed4931012b60b0084c9b"

@@ -1,0 +1,18 @@
+*.md text eol=lf
+*.sh text eol=lf
+*.js text eol=lf
+*.cs text eol=lf
+*.csproj text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.tsv text eol=lf
+*.txt text eol=lf
+
+*.win binary
+*.bps binary
+*.xdelta binary
+*.mp4 binary
+*.exe binary
+*.dll binary
+*.png binary
+*.jpg binary

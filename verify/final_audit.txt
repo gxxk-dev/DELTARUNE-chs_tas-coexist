@@ -1,0 +1,46 @@
+== final output SHA256 ==
+1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954  output/data.win
+b45e1555a96cc82be8200315716b5de3bfcd41acb0eac85407415fd2aa42b31d  output/chapter1_windows/data.win
+ea86de7e44ce1c557fa5599346d3372d5c39114e26ef30ed25928580673ea343  output/chapter2_windows/data.win
+a16f79336d2c7d981c1d89842efde2493aae03a5d38ff263514fde5de587c609  output/chapter3_windows/data.win
+15ffd455c030fd4beb60e5971b6fb220f49fb88124f4e344a9e6b039369c302b  output/chapter4_windows/data.win
+31a6d51050a10143a2f9842043c9e20b87577332de0fed4931012b60b0084c9b  output/chapter5_windows/data.win
+
+== installed layout checks ==
+main_data_matches_output
+chapter1_data_matches_output
+chapter1_data_keucher_matches_output
+chapter2_data_matches_output
+chapter2_data_keucher_matches_output
+chapter3_data_matches_output
+chapter3_data_keucher_matches_output
+chapter4_data_matches_output
+chapter4_data_keucher_matches_output
+chapter5_data_matches_output
+chapter5_data_keucher_matches_output
+
+== feature checks ==
+keucher_strings_present:
+- data_keucher.win
+- Keucher Mod
+- obj_savestate_manager
+- Welcome to Keucher Mod!
+
+chs_external_resources_present:
+- chapter1_windows/lang
+- chapter2_windows/lang
+- chapter3_windows/lang
+- chapter3_windows/vid
+- chapter4_windows/lang
+- chapter5_windows/vid
+
+== code conflict check ==
+no_merged_lost_keucher_entries_after_manual_fixes
+
+== required manual fixes ==
+chapter1_to_5:gml_Object_obj_initializer2_Create_0:
+- keep obj_savestate_manager.loading guard
+- keep mod_init() call
+
+chapter5:gml_Object_obj_town_event_Create_0:
+- keep obj_savestate_manager.loading guard
