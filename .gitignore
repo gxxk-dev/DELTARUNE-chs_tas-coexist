@@ -12,6 +12,13 @@
 **/bin/
 **/obj/
 
+# Rust build output.
+/tools/patcher/target/
+
+# Generated, third-party-derived embedded patcher assets.
+# These are distributed only via release binaries, never committed to this repo.
+/tools/patcher/assets/
+
 # Logs and local machine files.
 *.log
 *.tmp

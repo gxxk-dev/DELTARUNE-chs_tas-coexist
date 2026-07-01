@@ -1,0 +1,39 @@
+[package]
+name = "dr-tas-chs-patcher"
+version = "0.1.0"
+edition = "2021"
+description = "Self-contained cross-platform GUI/CLI patcher that applies the DELTARUNE TAS(Keucher)+CHS coexist build to a clean vanilla install"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "dr-tas-chs"
+path = "src/main.rs"
+
+[dependencies]
+xdelta3 = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+clap = { version = "4", features = ["derive"] }
+eframe = { version = "0.35", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+# 运行时解压内嵌的 lang/vid(打包时用 zstd -19 压过)。纯 Rust 解码器,不引入 C 依赖。
+ruzstd = "0.7"
+
+# 原生文件夹选择框:Windows/macOS 用系统对话框;Linux 用 xdg-desktop-portal(避免 GTK 构建依赖)。
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+rfd = "0.15"
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "async-std"] }
+
+# 隐藏 Windows 上的控制台窗口(release);CLI 子命令再按需附着父进程控制台。
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_Console"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
