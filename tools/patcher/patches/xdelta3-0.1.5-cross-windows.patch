@@ -1,0 +1,54 @@
+--- a/Cargo.toml	2006-07-24 09:21:28.000000000 +0800
++++ b/Cargo.toml	2026-07-01 14:51:37.513344415 +0800
+@@ -23,7 +23,7 @@
+ [dependencies.libc]
+ version = "0.2"
+ [build-dependencies.bindgen]
+-version = "0.52"
++version = "0.70"
+ 
+ [build-dependencies.cc]
+ version = "1.0"
+--- a/build.rs	2019-12-08 07:13:23.000000000 +0800
++++ b/build.rs	2026-07-01 14:51:54.362267743 +0800
+@@ -49,13 +49,22 @@
+     {
+         let mut builder = bindgen::Builder::default();
+ 
++        // 交叉编译到 Windows(mingw)时,让 clang/bindgen 使用 mingw 的 target 与 sysroot,
++        // 否则会误用主机 /usr/include,导致 corecrt.h 与 glibc 的 typedef 冲突。
++        if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") && !cfg!(windows) {
++            builder = builder
++                .clang_arg("--target=x86_64-pc-windows-gnu")
++                .clang_arg("--sysroot=/usr/x86_64-w64-mingw32")
++                .clang_arg("-I/usr/x86_64-w64-mingw32/include");
++        }
++
+         for (key, val) in &defines {
+             builder = builder.clang_arg(format!("-D{}={}", key, val));
+         }
+         let bindings = builder
+             .header("xdelta3/xdelta3/xdelta3.h")
+-            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+-            .whitelist_function("xd3_.*")
++            .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
++            .allowlist_function("xd3_.*")
+             .generate()
+             .expect("Unable to generate bindings");
+ 
+@@ -77,8 +86,13 @@
+     let mut rng = rand::thread_rng();
+     let test_binary_fn = format!("{}/test-{}", out_dir, rng.gen::<i32>());
+ 
+-    #[cfg(windows)]
+-    let test_binary_fn = format!("{}.exe", test_binary_fn);
++    // 交叉编译修正:按 TARGET(而非主机)决定是否加 .exe。mingw gcc 会自动给输出补 .exe,
++    // 原 #[cfg(windows)] 是主机判断,Linux 上交叉编 Windows 时不加 .exe,导致执行探测程序时 ENOENT。
++    let test_binary_fn = if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
++        format!("{}.exe", test_binary_fn)
++    } else {
++        test_binary_fn
++    };
+ 
+     let test_source_fn = format!("{}/test-{:x}.c", out_dir, rng.gen::<i32>());
+     let mut test_source = File::create(&test_source_fn).expect("Error creating test compile files");
