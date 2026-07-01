@@ -19,6 +19,9 @@
 # These are distributed only via release binaries, never committed to this repo.
 /tools/patcher/assets/
 
+# Built release binaries and packaged patch sets (distributed via releases only).
+/dist/
+
 # Logs and local machine files.
 *.log
 *.tmp
