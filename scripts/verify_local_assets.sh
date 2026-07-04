@@ -62,11 +62,12 @@ if [ -z "$chs" ]; then
   echo "CHS_RELEASE_DIR is not set" >&2
   fail=1
 else
-  check_sha256 b769a848b3adc0cf22d39bcf8c1f014782f9c4f4d0d20a2810f284d12d3ff727 "$chs/main.xdelta"
-  check_sha256 db2af8926cbe372c94a53dcaac894c2b822632d86fda8f6a43bd2fd17e909f84 "$chs/chapter1.xdelta"
-  check_sha256 40b1eb028da3f32e928e8d2438d9bada771c5492dc414f775c17770c04ba0840 "$chs/chapter2.xdelta"
-  check_sha256 5e641eb9f824dc72aaa15a37d7891303dac2d9deefe6e151a3b038c4ff6f5184 "$chs/chapter3.xdelta"
-  check_sha256 98e1f7ef1c7d37fcc83acd804f2ad27b29107ee2d0285fe71be57f4db669b50c "$chs/chapter4.xdelta"
+  check_sha256 2e9d26760203b92cb67fa99d6e28300d02664976e29a9e45fca098e8ef9b9461 "$chs/main.xdelta"
+  check_sha256 2e1083219227b371938012a36c776a5790ced8fa403b45b02094eb9c7c1396a9 "$chs/chapter1.xdelta"
+  check_sha256 a98580c4febbcae62d4fac457fa53178a37c01145dc37aa0efe58ede0bd2b392 "$chs/chapter2.xdelta"
+  check_sha256 620c3239156a38f9559b0fc5c86ffccb25be192a43352e33b57f27ee0e17ef01 "$chs/chapter3.xdelta"
+  check_sha256 4563d9b6765fbc790e2367765b3b4dca7b3da2da2c1e27cecd6929f2684529bf "$chs/chapter4.xdelta"
+  check_sha256 15627d6912ac2226dab8ff7fac14c3442013f5abbb504262ec955b6203ca92d4 "$chs/chapter5.xdelta"
 fi
 
 if [ -z "$chs_source" ]; then
@@ -76,7 +77,7 @@ else
   check_file "$chs_source/src/deltarunePacker.csproj"
   if git -C "$chs_source" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     actual_commit="$(git -C "$chs_source" rev-parse HEAD)"
-    expected_commit="a43a1ec74d2af9a63d6fddc97b8fef708a1a941f"
+    expected_commit="5f95b0d1d16f80c267eefb6a9ccfd039b0800e0c"
     if [ "$actual_commit" != "$expected_commit" ]; then
       echo "DeltaruneChinese commit mismatch:" >&2
       echo "  expected: $expected_commit" >&2

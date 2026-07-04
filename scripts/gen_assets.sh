@@ -41,8 +41,9 @@ if [ -f "$ui_font" ]; then
   pybin="$(command -v python3 || true)"
   if [ -n "$pybin" ] && ! "$pybin" -c "import fontTools" 2>/dev/null; then
     venv="${FONT_VENV:-/tmp/drtcs-ftenv}"
-    python3 -m venv "$venv" >/dev/null 2>&1 && "$venv/bin/pip" install --quiet fonttools >/dev/null 2>&1
-    pybin="$venv/bin/python"
+    if python3 -m venv "$venv" >/dev/null 2>&1 && "$venv/bin/pip" install --quiet fonttools >/dev/null 2>&1; then
+      pybin="$venv/bin/python"
+    fi
   fi
   if [ -n "$pybin" ] && "$pybin" -c "import fontTools" 2>/dev/null; then
     "$pybin" "$root/scripts/subset_font.py" "$ui_font" "$assets/fonts/ui.ttf" "$root/tools/patcher/src"
@@ -119,7 +120,7 @@ cat > "$assets/manifest.json" <<EOF
   "schema": 1,
   "description": "DELTARUNE Keucher Mod + CHS coexist patch set. Third-party derived content; apply only to a matching clean vanilla install.",
   "keucher_mod_version": "v5.10.5",
-  "deltarune_chinese_commit": "a43a1ec74d2af9a63d6fddc97b8fef708a1a941f",
+  "deltarune_chinese_commit": "5f95b0d1d16f80c267eefb6a9ccfd039b0800e0c",
   "targets": [
 $target_json
   ],

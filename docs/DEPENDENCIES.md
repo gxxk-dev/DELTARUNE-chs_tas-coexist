@@ -45,7 +45,7 @@ export KEUCHER_MOD_DIR="/path/to/Keucher.Mod.v5.10.5"
 本研究使用：
 
 - Repository: `https://github.com/gm3dr/DeltaruneChinese.git`
-- Commit: `a43a1ec74d2af9a63d6fddc97b8fef708a1a941f`
+- Commit: `5f95b0d1d16f80c267eefb6a9ccfd039b0800e0c`
 
 默认脚本使用环境变量：
 
@@ -59,16 +59,17 @@ export DELTARUNE_CHINESE_DIR="/path/to/DeltaruneChinese"
 
 | File | SHA256 |
 | --- | --- |
-| `main.xdelta` | `b769a848b3adc0cf22d39bcf8c1f014782f9c4f4d0d20a2810f284d12d3ff727` |
-| `chapter1.xdelta` | `db2af8926cbe372c94a53dcaac894c2b822632d86fda8f6a43bd2fd17e909f84` |
-| `chapter2.xdelta` | `40b1eb028da3f32e928e8d2438d9bada771c5492dc414f775c17770c04ba0840` |
-| `chapter3.xdelta` | `5e641eb9f824dc72aaa15a37d7891303dac2d9deefe6e151a3b038c4ff6f5184` |
-| `chapter4.xdelta` | `98e1f7ef1c7d37fcc83acd804f2ad27b29107ee2d0285fe71be57f4db669b50c` |
+| `main.xdelta` | `2e9d26760203b92cb67fa99d6e28300d02664976e29a9e45fca098e8ef9b9461` |
+| `chapter1.xdelta` | `2e1083219227b371938012a36c776a5790ced8fa403b45b02094eb9c7c1396a9` |
+| `chapter2.xdelta` | `a98580c4febbcae62d4fac457fa53178a37c01145dc37aa0efe58ede0bd2b392` |
+| `chapter3.xdelta` | `620c3239156a38f9559b0fc5c86ffccb25be192a43352e33b57f27ee0e17ef01` |
+| `chapter4.xdelta` | `4563d9b6765fbc790e2367765b3b4dca7b3da2da2c1e27cecd6929f2684529bf` |
+| `chapter5.xdelta` | `15627d6912ac2226dab8ff7fac14c3442013f5abbb504262ec955b6203ca92d4` |
 
 默认脚本使用环境变量：
 
 ```bash
-export CHS_RELEASE_DIR="/path/to/dr-ch-patch-290629-.5"
+export CHS_RELEASE_DIR="/path/to/dr-ch-patch-260704-including-ch5"
 ```
 
 ### RomPatcher.js

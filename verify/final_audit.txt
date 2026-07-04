@@ -1,10 +1,10 @@
 == final output SHA256 ==
 1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954  output/data.win
-b45e1555a96cc82be8200315716b5de3bfcd41acb0eac85407415fd2aa42b31d  output/chapter1_windows/data.win
-ea86de7e44ce1c557fa5599346d3372d5c39114e26ef30ed25928580673ea343  output/chapter2_windows/data.win
-a16f79336d2c7d981c1d89842efde2493aae03a5d38ff263514fde5de587c609  output/chapter3_windows/data.win
-15ffd455c030fd4beb60e5971b6fb220f49fb88124f4e344a9e6b039369c302b  output/chapter4_windows/data.win
-31a6d51050a10143a2f9842043c9e20b87577332de0fed4931012b60b0084c9b  output/chapter5_windows/data.win
+546b5be82c3f39775fd9ad13bdd7dd705186c1461dd22c18dac8ed0d8e4ebec5  output/chapter1_windows/data.win
+c216f1e0058418f2ce392104f9e01fa977ee1bb10763b34f815954c11ac218de  output/chapter2_windows/data.win
+c0621c33ccc514657b34ab1411766a0fc524391c20de76e6cc1db937a8f15948  output/chapter3_windows/data.win
+316eed82f924b7bca13ad61c6f047cf17f4bf8bb4ed9cd531c1cefb9d30e0225  output/chapter4_windows/data.win
+b9ba21b728e06fa616924c4dd3511ada31dfd7ba371f4053ec5eea61682fbe4f  output/chapter5_windows/data.win
 
 == installed layout checks ==
 main_data_matches_output
@@ -32,6 +32,7 @@ chs_external_resources_present:
 - chapter3_windows/lang
 - chapter3_windows/vid
 - chapter4_windows/lang
+- chapter5_windows/lang
 - chapter5_windows/vid
 
 == code conflict check ==
