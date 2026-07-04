@@ -7,7 +7,7 @@
 1. 从正版 DELTARUNE 读取原始 `data.win` files。
 2. 使用 Keucher/TAS Mod 的 `.bps` patches 生成 TAS baseline。
 3. 使用 DeltaruneChinese packer，以 TAS baseline 作为输入导入 CHS resources。
-4. 对冲突 GML 保留 Keucher/TAS runtime hooks。
+4. 对冲突 GML 保留 Keucher/TAS runtime hooks，并应用本仓库记录的 Keucher savestate hotfix。
 5. 将合并后的 chapter `data.win` 同时安装为 `data_keucher.win`，因为 Keucher chapter select 会加载这个文件。
 
 ## Important merge notes
@@ -33,6 +33,14 @@ mod_init();
 缺少 `mod_init();` 会导致进入章节时 `obj_time` 读取未初始化的 `global.debug_keybinds_on` 并崩溃。
 
 - Chapter 5 的 `gml_Object_obj_town_event_Create_0` 也需要保留 savestate loading guard。
+- Chapter 1-5 的 `gml_Object_obj_savestate_manager_Create_0` 需要应用 `scripts/apply_keucher_savestate_hotfix.sh`：
+
+```bash
+./scripts/apply_keucher_savestate_hotfix.sh work/DeltaruneChinese-260704/workspace build/keucher
+```
+
+这个 hotfix 保留 Keucher 原始 savestate manager，但在 `decode_var_info()` 还原 constructor 时先把 JSON 里的 numeric script asset id 转成 callable method，再调用 `new`。否则读取包含 constructor struct 的 savestate 会在 `obj_savestate_manager` Alarm 0 报 `Trying to construct something that isn't a function`。
+
 - 每个 `chapterN_windows/data_keucher.win` 应与对应的 merged `chapterN_windows/data.win` byte-for-byte 一致。
 
 ## Expected final output hashes
@@ -42,11 +50,11 @@ mod_init();
 | File | SHA256 |
 | --- | --- |
 | `output/data.win` | `1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954` |
-| `output/chapter1_windows/data.win` | `546b5be82c3f39775fd9ad13bdd7dd705186c1461dd22c18dac8ed0d8e4ebec5` |
-| `output/chapter2_windows/data.win` | `c216f1e0058418f2ce392104f9e01fa977ee1bb10763b34f815954c11ac218de` |
-| `output/chapter3_windows/data.win` | `c0621c33ccc514657b34ab1411766a0fc524391c20de76e6cc1db937a8f15948` |
-| `output/chapter4_windows/data.win` | `316eed82f924b7bca13ad61c6f047cf17f4bf8bb4ed9cd531c1cefb9d30e0225` |
-| `output/chapter5_windows/data.win` | `b9ba21b728e06fa616924c4dd3511ada31dfd7ba371f4053ec5eea61682fbe4f` |
+| `output/chapter1_windows/data.win` | `cc41dbb6061f811b1ede4516cfeef16132ea8970ec8afc02c1af17568181b344` |
+| `output/chapter2_windows/data.win` | `8b551e5fdef4daa631c670e9b7bc9a8a72f60d90ab0af8b332fc8557e214fe3e` |
+| `output/chapter3_windows/data.win` | `97221fbd145673c7fe2b4cc52edb5482765c77cc0ec0119b156c18151c60bbde` |
+| `output/chapter4_windows/data.win` | `e15919bb864593b17db8e136d2f75efb3c44b1831850887bb9efbc6bb3b28487` |
+| `output/chapter5_windows/data.win` | `87996269779bc98f8d517d2f963150f0de29ae545b23072280ab260905c6a2e5` |
 
 ## Verification
 

@@ -1,10 +1,10 @@
 == final output SHA256 ==
 1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954  output/data.win
-546b5be82c3f39775fd9ad13bdd7dd705186c1461dd22c18dac8ed0d8e4ebec5  output/chapter1_windows/data.win
-c216f1e0058418f2ce392104f9e01fa977ee1bb10763b34f815954c11ac218de  output/chapter2_windows/data.win
-c0621c33ccc514657b34ab1411766a0fc524391c20de76e6cc1db937a8f15948  output/chapter3_windows/data.win
-316eed82f924b7bca13ad61c6f047cf17f4bf8bb4ed9cd531c1cefb9d30e0225  output/chapter4_windows/data.win
-b9ba21b728e06fa616924c4dd3511ada31dfd7ba371f4053ec5eea61682fbe4f  output/chapter5_windows/data.win
+cc41dbb6061f811b1ede4516cfeef16132ea8970ec8afc02c1af17568181b344  output/chapter1_windows/data.win
+8b551e5fdef4daa631c670e9b7bc9a8a72f60d90ab0af8b332fc8557e214fe3e  output/chapter2_windows/data.win
+97221fbd145673c7fe2b4cc52edb5482765c77cc0ec0119b156c18151c60bbde  output/chapter3_windows/data.win
+e15919bb864593b17db8e136d2f75efb3c44b1831850887bb9efbc6bb3b28487  output/chapter4_windows/data.win
+87996269779bc98f8d517d2f963150f0de29ae545b23072280ab260905c6a2e5  output/chapter5_windows/data.win
 
 == installed layout checks ==
 main_data_matches_output
@@ -45,3 +45,11 @@ chapter1_to_5:gml_Object_obj_initializer2_Create_0:
 
 chapter5:gml_Object_obj_town_event_Create_0:
 - keep obj_savestate_manager.loading guard
+
+chapter1_to_5:gml_Object_obj_savestate_manager_Create_0:
+- apply scripts/apply_keucher_savestate_hotfix.sh
+- constructor restore uses method(undefined, const_func) before new
+- prevents obj_savestate_manager Alarm 0 crash: Trying to construct something that isn't a function
+
+== latest install backup ==
+/home/frez79/DELTARUNE-chs_tas-coexist/backups/DELTARUNE-20260704-193432

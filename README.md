@@ -66,6 +66,7 @@ export DELTARUNE_CHINESE_DIR="/path/to/DeltaruneChinese"
 - 可行路线是先用 Keucher `.bps` 生成 TAS baseline，再用 DeltaruneChinese packer 导入 CHS resources。
 - Chapter 1-5 的 `gml_Object_obj_initializer2_Create_0` 必须保留 Keucher/TAS 的 savestate guard 和 `mod_init();`。
 - 缺少 `mod_init();` 会导致进入章节时 `global.debug_keybinds_on` 未初始化。
+- Chapter 1-5 的 `gml_Object_obj_savestate_manager_Create_0` 需要应用 `scripts/apply_keucher_savestate_hotfix.sh`，修复 Keucher savestate 读取 constructor struct 时把 numeric script asset id 直接 `new` 导致的崩溃。
 - Keucher chapter select 会加载 `data_keucher.win`，所以每个 chapter 的 `data_keucher.win` 必须与 merged chapter `data.win` 一致。
 
 ## Verification
