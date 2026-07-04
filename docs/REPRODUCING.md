@@ -33,13 +33,16 @@ mod_init();
 缺少 `mod_init();` 会导致进入章节时 `obj_time` 读取未初始化的 `global.debug_keybinds_on` 并崩溃。
 
 - Chapter 5 的 `gml_Object_obj_town_event_Create_0` 也需要保留 savestate loading guard。
-- Chapter 1-5 的 `gml_Object_obj_savestate_manager_Create_0` 需要应用 `scripts/apply_keucher_savestate_hotfix.sh`：
+- Chapter 1-5 需要应用 `scripts/apply_keucher_savestate_hotfix.sh`：
 
 ```bash
 ./scripts/apply_keucher_savestate_hotfix.sh work/DeltaruneChinese-260704/workspace build/keucher
 ```
 
-这个 hotfix 保留 Keucher 原始 savestate manager，但在 `decode_var_info()` 还原 constructor 时先把 JSON 里的 numeric script asset id 转成 callable method，再调用 `new`。否则读取包含 constructor struct 的 savestate 会在 `obj_savestate_manager` Alarm 0 报 `Trying to construct something that isn't a function`。
+这个 hotfix 会导入两处 Keucher code 修正：
+
+- `gml_Object_obj_savestate_manager_Create_0`：保留 Keucher 原始 savestate manager，但在 `decode_var_info()` 还原 constructor 时先把 JSON 里的 numeric script asset id 转成 callable method，再调用 `new`。否则读取包含 constructor struct 的 savestate 会在 `obj_savestate_manager` Alarm 0 报 `Trying to construct something that isn't a function`。
+- `gml_Object_obj_readable_room1_Step_0`：在 `obj_savestate_manager.loading` 期间直接 `exit`，并兜底初始化缺失的 `myinteract`。否则从非对话场景读取一个保存于对话中的 savestate 时，目标房间实例可能在 Alarm 0 写回保存变量前先跑 Step，并报 `Variable obj_readable_room1.myinteract not set before reading it`。
 
 - 每个 `chapterN_windows/data_keucher.win` 应与对应的 merged `chapterN_windows/data.win` byte-for-byte 一致。
 
@@ -50,11 +53,11 @@ mod_init();
 | File | SHA256 |
 | --- | --- |
 | `output/data.win` | `1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954` |
-| `output/chapter1_windows/data.win` | `cc41dbb6061f811b1ede4516cfeef16132ea8970ec8afc02c1af17568181b344` |
-| `output/chapter2_windows/data.win` | `8b551e5fdef4daa631c670e9b7bc9a8a72f60d90ab0af8b332fc8557e214fe3e` |
-| `output/chapter3_windows/data.win` | `97221fbd145673c7fe2b4cc52edb5482765c77cc0ec0119b156c18151c60bbde` |
-| `output/chapter4_windows/data.win` | `e15919bb864593b17db8e136d2f75efb3c44b1831850887bb9efbc6bb3b28487` |
-| `output/chapter5_windows/data.win` | `87996269779bc98f8d517d2f963150f0de29ae545b23072280ab260905c6a2e5` |
+| `output/chapter1_windows/data.win` | `01599fa44c3f55c456034f43d952f3bbd8707bfa353d90de3bea401460a62937` |
+| `output/chapter2_windows/data.win` | `bce25d8e821f5e0b506e18021b6dfdc29907e544632187af666488e44ea14332` |
+| `output/chapter3_windows/data.win` | `6d9af5d08a6b269c5c7b9ee3030d4abbe1e7191e494fb6adf54c1795e5fed58e` |
+| `output/chapter4_windows/data.win` | `db0c75ff12dfa68fe0f89af67690568ae8fe06587d9d6007aaa6e78f7e9390a7` |
+| `output/chapter5_windows/data.win` | `9546155f6af8ec5440d4aeeb4f475367a9ad6a7754441634c41bc7dba7b9f11b` |
 
 ## Verification
 

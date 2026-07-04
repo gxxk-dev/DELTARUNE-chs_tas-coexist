@@ -20,12 +20,13 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
 probe_project=${DATAWIN_PROBE_PROJECT:-tools/DataWinProbe}
-code_name=gml_Object_obj_savestate_manager_Create_0
+savestate_code_name=gml_Object_obj_savestate_manager_Create_0
+readable_step_code_name=gml_Object_obj_readable_room1_Step_0
 
 for chapter in 1 2 3 4 5; do
     data_win="$keucher_dir/chapter${chapter}_windows/data.win"
     import_dir="$workspace/ch${chapter}/imports/code"
-    output_file="$import_dir/${code_name}.gml"
+    output_file="$import_dir/${savestate_code_name}.gml"
     tmp_file="${output_file}.tmp"
 
     if [[ ! -f "$data_win" ]]; then
@@ -37,7 +38,7 @@ for chapter in 1 2 3 4 5; do
         exit 1
     fi
 
-    dotnet run --project "$probe_project" -- decompile "$data_win" "$code_name" > "$tmp_file"
+    dotnet run --project "$probe_project" -- decompile "$data_win" "$savestate_code_name" > "$tmp_file"
     if ! rg -q "new arg0\\.const_func\\(\\)" "$tmp_file"; then
         echo "Expected constructor restore pattern not found for chapter $chapter" >&2
         rm -f "$tmp_file"
@@ -48,6 +49,27 @@ for chapter in 1 2 3 4 5; do
 
     if ! rg -q "method\\(undefined, const_func\\)" "$tmp_file" || rg -q "new arg0\\.const_func\\(\\)" "$tmp_file"; then
         echo "Hotfix replacement failed for chapter $chapter" >&2
+        rm -f "$tmp_file"
+        exit 1
+    fi
+
+    mv "$tmp_file" "$output_file"
+    echo "Wrote $output_file"
+
+    output_file="$import_dir/${readable_step_code_name}.gml"
+    tmp_file="${output_file}.tmp"
+
+    dotnet run --project "$probe_project" -- decompile "$data_win" "$readable_step_code_name" > "$tmp_file"
+    if ! rg -q "if \\(myinteract == 3\\)" "$tmp_file"; then
+        echo "Expected obj_readable_room1 Step pattern not found for chapter $chapter" >&2
+        rm -f "$tmp_file"
+        exit 1
+    fi
+    if ! rg -q "obj_savestate_manager\\.loading" "$tmp_file"; then
+        perl -0pi -e 's/\A/if (obj_savestate_manager.loading)\n{\n    exit;\n}\nif (!variable_instance_exists(id, "myinteract"))\n{\n    myinteract = 0;\n}\n\n/s' "$tmp_file"
+    fi
+    if ! rg -q "variable_instance_exists\\(id, \"myinteract\"\\)" "$tmp_file"; then
+        echo "Readable Step hotfix insertion failed for chapter $chapter" >&2
         rm -f "$tmp_file"
         exit 1
     fi
