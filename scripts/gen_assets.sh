@@ -86,6 +86,19 @@ target_json="${target_json%,
 
 # 收集 CHS 外置资源(lang/ 各章,vid/ 仅 ch3/ch5),生成 extras 映射
 extra_json=""
+
+# ch5 intro 在 GML 里使用相对路径加载。不同启动方式下 working_directory
+# 可能落在游戏根目录或 chapter5_windows,因此同时铺放 root 与 chapter fallback。
+intro_audio="$out/mus/ch5_intro_audio.ogg"
+if [ -f "$intro_audio" ]; then
+  mkdir -p "$assets/mus/chapter5"
+  zstd -19 -q -f -o "$assets/mus/chapter5/ch5_intro_audio.ogg.zst" "$intro_audio"
+  extra_json+="    {\"asset\":\"mus/chapter5/ch5_intro_audio.ogg\",\"rel\":\"mus/ch5_intro_audio.ogg\"},
+"
+  extra_json+="    {\"asset\":\"mus/chapter5/ch5_intro_audio.ogg\",\"rel\":\"chapter5_windows/mus/ch5_intro_audio.ogg\"},
+"
+fi
+
 for c in 1 2 3 4 5; do
   langdir="$out/chapter${c}_windows/lang"
   if [ -d "$langdir" ]; then
@@ -109,6 +122,10 @@ for c in 1 2 3 4 5; do
       zstd -19 -q -f -o "$assets/vid/chapter${c}/$bn.zst" "$f"
       extra_json+="    {\"asset\":\"vid/chapter${c}/$bn\",\"rel\":\"chapter${c}_windows/vid/$bn\"},
 "
+      if [ "$c" = 5 ] && [[ "$bn" == ch5_intro_*.mp4 ]]; then
+        extra_json+="    {\"asset\":\"vid/chapter${c}/$bn\",\"rel\":\"vid/$bn\"},
+"
+      fi
     done
   fi
 done
