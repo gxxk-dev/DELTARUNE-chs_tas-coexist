@@ -4,7 +4,7 @@
 bce25d8e821f5e0b506e18021b6dfdc29907e544632187af666488e44ea14332  output/chapter2_windows/data.win
 6d9af5d08a6b269c5c7b9ee3030d4abbe1e7191e494fb6adf54c1795e5fed58e  output/chapter3_windows/data.win
 db0c75ff12dfa68fe0f89af67690568ae8fe06587d9d6007aaa6e78f7e9390a7  output/chapter4_windows/data.win
-9546155f6af8ec5440d4aeeb4f475367a9ad6a7754441634c41bc7dba7b9f11b  output/chapter5_windows/data.win
+58368524a0aaf48747d425aac58435b6e76bf2c8bd039a2185ed94c1ba82a7af  output/chapter5_windows/data.win
 
 == installed layout checks ==
 main_data_matches_output
@@ -57,5 +57,11 @@ chapter1_to_5:gml_Object_obj_readable_room1_Step_0:
 - initialize missing myinteract to 0 before reading it
 - prevents obj_readable_room1 Step crash: Variable obj_readable_room1.myinteract not set before reading it
 
+chapter5:pause/savestate manager:
+- apply scripts/apply_ch5_pause_savestate_hotfix.sh
+- keep obj_savestate_manager in mod_init() omnipresent instances
+- guard obj_pause_emulator_Create_0, obj_time_Create_0, and obj_time_Step_1 before reading obj_savestate_manager.loading
+- prevents boss-room Pause crash: Unable to find any instance for object index 1742 name obj_savestate_manager
+
 == latest install backup ==
-/home/frez79/DELTARUNE-chs_tas-coexist/backups/DELTARUNE-20260704-200713
+/home/frez79/DELTARUNE-chs_tas-coexist/backups/DELTARUNE-20260705-161732-savestate-manager-hotfix/chapter5_windows

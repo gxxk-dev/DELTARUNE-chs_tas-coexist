@@ -1,5 +1,6 @@
 using Underanalyzer.Decompiler;
 using UndertaleModLib;
+using UndertaleModLib.Compiler;
 using UndertaleModLib.Decompiler;
 using System.Security.Cryptography;
 using System.Text;
@@ -32,7 +33,7 @@ static string Hash(string content)
 if (args.Length < 2)
 {
     Console.Error.WriteLine("Usage: DataWinProbe <command> <data.win> [args...]");
-    Console.Error.WriteLine("Commands: summary, list-code, grep-strings <term>, decompile <codeName>, compare-code <keucher.win> <merged.win> <code-list>");
+    Console.Error.WriteLine("Commands: summary, list-code, grep-strings <term>, grep-code <term>, decompile <codeName>, replace-code <codeName> <gml> <output.win>, compare-code <keucher.win> <merged.win> <code-list>");
     return 2;
 }
 
@@ -59,9 +60,39 @@ switch (command)
         foreach (var item in data.Strings.Select(x => x.Content).Where(x => x.Contains(term, StringComparison.OrdinalIgnoreCase)).Order())
             Console.WriteLine(item);
         break;
+    case "grep-code":
+        if (args.Length < 3) throw new Exception("grep-code requires a term");
+        string codeTerm = args[2];
+        foreach (var code in data.Code.Where(x => x != null).Select(x => x.Name.Content).Order())
+        {
+            try
+            {
+                if (Decompile(data, code).Contains(codeTerm, StringComparison.OrdinalIgnoreCase))
+                    Console.WriteLine(code);
+            }
+            catch
+            {
+                // Some entries are compiler-generated child code and cannot be decompiled as roots.
+            }
+        }
+        break;
     case "decompile":
         if (args.Length < 3) throw new Exception("decompile requires a code name");
         Console.Write(Decompile(data, args[2]));
+        break;
+    case "replace-code":
+        if (args.Length < 5) throw new Exception("replace-code requires <codeName> <gml> <output.win>");
+        string replaceCodeName = args[2];
+        string gmlPath = args[3];
+        string outputPath = args[4];
+        if (data.Code.ByName(replaceCodeName) == null) throw new Exception($"Code not found: {replaceCodeName}");
+        CodeImportGroup importGroup = new(data);
+        importGroup.QueueReplace(replaceCodeName, File.ReadAllText(gmlPath, Encoding.UTF8));
+        CompileResult compileResult = importGroup.Import();
+        if (!compileResult.Successful)
+            throw new Exception(compileResult.PrintAllErrors(true));
+        using (FileStream output = new(outputPath, FileMode.Create, FileAccess.Write))
+            UndertaleIO.Write(output, data);
         break;
     case "compare-code":
         if (args.Length < 5) throw new Exception("compare-code requires <keucher.win> <merged.win> <code-list>");

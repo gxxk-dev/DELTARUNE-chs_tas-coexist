@@ -7,7 +7,7 @@
 1. 从正版 DELTARUNE 读取原始 `data.win` files。
 2. 使用 Keucher/TAS Mod 的 `.bps` patches 生成 TAS baseline。
 3. 使用 DeltaruneChinese packer，以 TAS baseline 作为输入导入 CHS resources。
-4. 对冲突 GML 保留 Keucher/TAS runtime hooks，并应用本仓库记录的 Keucher savestate hotfix。
+4. 对冲突 GML 保留 Keucher/TAS runtime hooks，并应用本仓库记录的 Keucher savestate/pause hotfix。
 5. 将合并后的 chapter `data.win` 同时安装为 `data_keucher.win`，因为 Keucher chapter select 会加载这个文件。
 
 ## Important merge notes
@@ -44,6 +44,14 @@ mod_init();
 - `gml_Object_obj_savestate_manager_Create_0`：保留 Keucher 原始 savestate manager，但在 `decode_var_info()` 还原 constructor 时先把 JSON 里的 numeric script asset id 转成 callable method，再调用 `new`。否则读取包含 constructor struct 的 savestate 会在 `obj_savestate_manager` Alarm 0 报 `Trying to construct something that isn't a function`。
 - `gml_Object_obj_readable_room1_Step_0`：在 `obj_savestate_manager.loading` 期间直接 `exit`，并兜底初始化缺失的 `myinteract`。否则从非对话场景读取一个保存于对话中的 savestate 时，目标房间实例可能在 Alarm 0 写回保存变量前先跑 Step，并报 `Variable obj_readable_room1.myinteract not set before reading it`。
 
+- Chapter 5 需要应用 `scripts/apply_ch5_pause_savestate_hotfix.sh`：
+
+```bash
+./scripts/apply_ch5_pause_savestate_hotfix.sh output/chapter5_windows/data.win
+```
+
+这个 hotfix 会让 `gml_GlobalScript_mod_init` 创建并持久化 `obj_savestate_manager`，同时给 `obj_pause_emulator_Create_0`、`obj_time_Create_0` 和 `obj_time_Step_1` 的 `obj_savestate_manager.loading` 读取加上存在性检查。否则某些 boss 战房间 Pause 时会报 `Unable to find any instance for object index '1742' name 'obj_savestate_manager'`。
+
 - 每个 `chapterN_windows/data_keucher.win` 应与对应的 merged `chapterN_windows/data.win` byte-for-byte 一致。
 
 ## Expected final output hashes
@@ -57,7 +65,7 @@ mod_init();
 | `output/chapter2_windows/data.win` | `bce25d8e821f5e0b506e18021b6dfdc29907e544632187af666488e44ea14332` |
 | `output/chapter3_windows/data.win` | `6d9af5d08a6b269c5c7b9ee3030d4abbe1e7191e494fb6adf54c1795e5fed58e` |
 | `output/chapter4_windows/data.win` | `db0c75ff12dfa68fe0f89af67690568ae8fe06587d9d6007aaa6e78f7e9390a7` |
-| `output/chapter5_windows/data.win` | `9546155f6af8ec5440d4aeeb4f475367a9ad6a7754441634c41bc7dba7b9f11b` |
+| `output/chapter5_windows/data.win` | `58368524a0aaf48747d425aac58435b6e76bf2c8bd039a2185ed94c1ba82a7af` |
 
 ## Verification
 
