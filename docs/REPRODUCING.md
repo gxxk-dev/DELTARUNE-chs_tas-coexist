@@ -61,11 +61,11 @@ mod_init();
 | File | SHA256 |
 | --- | --- |
 | `output/data.win` | `1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954` |
-| `output/chapter1_windows/data.win` | `138023d7d1c4eeedc76487097cbb204c085a727f3b91eac5c91078a0bbf98ff9` |
-| `output/chapter2_windows/data.win` | `4b33fe4c66179b4f9ec73ccb9b31861f71550bc8470e93835cd5a6917102a2c4` |
-| `output/chapter3_windows/data.win` | `52319d6f0060102cec73eeaf27c543422a634401ece4f8b9facf9e9a50de27b7` |
-| `output/chapter4_windows/data.win` | `5de41b573d58a6e3042daee01e818de5baeba3de39cea8d2b6f7334f2f2ec3bc` |
-| `output/chapter5_windows/data.win` | `c4ebafae714e4a93eed62bda7e79739b10ed8f7e8d15ea235691157fd4835364` |
+| `output/chapter1_windows/data.win` | `b59769498ac449a94abce4fc5b7cd597db997f3698512909b38c6eab62f7b6f6` |
+| `output/chapter2_windows/data.win` | `6e47f7ad27437af4c212ab555093ab43ba17b1e7e5f1778bd6a2cb2372eae49a` |
+| `output/chapter3_windows/data.win` | `ecc9a892443b058803dcd86924e37d6a01020837f58a2c3868191122172d057e` |
+| `output/chapter4_windows/data.win` | `cdd5a178448519d33e73f945d3651ed63c24c310fd701dbf796e44ef74ef2260` |
+| `output/chapter5_windows/data.win` | `a0627060906e9e1630ff76969bbaf2d11c078db57797c829f104b2b00cb1299d` |
 
 ## Verification
 

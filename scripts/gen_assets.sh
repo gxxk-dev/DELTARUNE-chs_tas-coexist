@@ -137,7 +137,7 @@ cat > "$assets/manifest.json" <<EOF
   "schema": 1,
   "description": "DELTARUNE Keucher Mod + CHS coexist patch set. Third-party derived content; apply only to a matching clean vanilla install.",
   "keucher_mod_version": "v5.10.5",
-  "deltarune_chinese_commit": "5056d2d6cab5ee827c00e8d6becc2dde225be514",
+  "deltarune_chinese_commit": "824524b6c86b4b902ba13ee6c5483f3cfeef3cec",
   "targets": [
 $target_json
   ],

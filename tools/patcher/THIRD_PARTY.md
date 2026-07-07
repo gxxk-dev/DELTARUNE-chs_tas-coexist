@@ -8,7 +8,7 @@
 
 - **DELTARUNE** © Toby Fox / 8-4。游戏本体不被分发;补丁只能应用到用户自有的、版本匹配的纯净安装。
 - **Keucher Mod**(`v5.10.5`)。savestate 与运行时钩子改动。版权归其作者。
-- **DeltaruneChinese / CHS 汉化**(<https://github.com/gm3dr/DeltaruneChinese>,commit `5056d2d6cab5ee827c00e8d6becc2dde225be514`)。中文文本、字体、贴图、图集等。版权归汉化组。
+- **DeltaruneChinese / CHS 汉化**(<https://github.com/gm3dr/DeltaruneChinese>,commit `824524b6c86b4b902ba13ee6c5483f3cfeef3cec`)。中文文本、字体、贴图、图集等。版权归汉化组。
 
 > 分发内嵌这些差分的二进制,等于再分发上述第三方的派生作品。请在发布前确认你已获得相应授权或许可。
 

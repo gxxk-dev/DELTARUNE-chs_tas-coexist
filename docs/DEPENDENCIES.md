@@ -45,7 +45,7 @@ export KEUCHER_MOD_DIR="/path/to/Keucher.Mod.v5.10.5"
 本研究使用：
 
 - Repository: `https://github.com/gm3dr/DeltaruneChinese.git`
-- Commit: `5056d2d6cab5ee827c00e8d6becc2dde225be514`
+- Commit: `824524b6c86b4b902ba13ee6c5483f3cfeef3cec`
 
 默认脚本使用环境变量：
 
