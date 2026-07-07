@@ -44,8 +44,6 @@ collect_targets() {
         exit 1
     fi
 
-    add_target_file "$target/data.win"
-    add_target_file "$target/data_keucher.win"
     add_target_file "$target/chapter5_windows/data.win"
     add_target_file "$target/chapter5_windows/data_keucher.win"
 }

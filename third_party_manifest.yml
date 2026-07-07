@@ -24,7 +24,7 @@ assets:
 
   deltarune_chinese_source:
     repository: "https://github.com/gm3dr/DeltaruneChinese.git"
-    commit: "5f95b0d1d16f80c267eefb6a9ccfd039b0800e0c"
+    commit: "5056d2d6cab5ee827c00e8d6becc2dde225be514"
     env: DELTARUNE_CHINESE_DIR
 
   chs_release_data:
@@ -41,8 +41,8 @@ assets:
 outputs:
   final_build_sha256:
     output/data.win: "1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954"
-    output/chapter1_windows/data.win: "546b5be82c3f39775fd9ad13bdd7dd705186c1461dd22c18dac8ed0d8e4ebec5"
-    output/chapter2_windows/data.win: "c216f1e0058418f2ce392104f9e01fa977ee1bb10763b34f815954c11ac218de"
-    output/chapter3_windows/data.win: "c0621c33ccc514657b34ab1411766a0fc524391c20de76e6cc1db937a8f15948"
-    output/chapter4_windows/data.win: "316eed82f924b7bca13ad61c6f047cf17f4bf8bb4ed9cd531c1cefb9d30e0225"
-    output/chapter5_windows/data.win: "b9ba21b728e06fa616924c4dd3511ada31dfd7ba371f4053ec5eea61682fbe4f"
+    output/chapter1_windows/data.win: "138023d7d1c4eeedc76487097cbb204c085a727f3b91eac5c91078a0bbf98ff9"
+    output/chapter2_windows/data.win: "4b33fe4c66179b4f9ec73ccb9b31861f71550bc8470e93835cd5a6917102a2c4"
+    output/chapter3_windows/data.win: "52319d6f0060102cec73eeaf27c543422a634401ece4f8b9facf9e9a50de27b7"
+    output/chapter4_windows/data.win: "5de41b573d58a6e3042daee01e818de5baeba3de39cea8d2b6f7334f2f2ec3bc"
+    output/chapter5_windows/data.win: "c4ebafae714e4a93eed62bda7e79739b10ed8f7e8d15ea235691157fd4835364"

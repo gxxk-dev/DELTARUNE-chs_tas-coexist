@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
     echo "Usage: $0 <DeltaruneChinese workspace> <Keucher baseline dir>" >&2
-    echo "Example: $0 work/DeltaruneChinese-260704/workspace build/keucher" >&2
+    echo "Example: $0 work/DeltaruneChinese-260707/workspace build/keucher" >&2
     exit 2
 fi
 

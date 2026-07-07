@@ -41,7 +41,7 @@
 
 - 正版 DELTARUNE full game installation。
 - Keucher Mod `v5.10.5` PC `.bps` patches。
-- DeltaruneChinese source commit `5f95b0d1d16f80c267eefb6a9ccfd039b0800e0c`。
+- DeltaruneChinese source commit `5056d2d6cab5ee827c00e8d6becc2dde225be514`。
 - CHS release package，包含 `.xdelta`、`lang/` 和 `vid/` files。
 - RomPatcher.js，用于应用 `.bps` patches。
 

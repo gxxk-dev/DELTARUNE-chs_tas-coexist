@@ -36,7 +36,7 @@ mod_init();
 - Chapter 1-5 需要应用 `scripts/apply_keucher_savestate_hotfix.sh`：
 
 ```bash
-./scripts/apply_keucher_savestate_hotfix.sh work/DeltaruneChinese-260704/workspace build/keucher
+./scripts/apply_keucher_savestate_hotfix.sh work/DeltaruneChinese-260707/workspace build/keucher
 ```
 
 这个 hotfix 会导入两处 Keucher code 修正：
@@ -61,11 +61,11 @@ mod_init();
 | File | SHA256 |
 | --- | --- |
 | `output/data.win` | `1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954` |
-| `output/chapter1_windows/data.win` | `01599fa44c3f55c456034f43d952f3bbd8707bfa353d90de3bea401460a62937` |
-| `output/chapter2_windows/data.win` | `bce25d8e821f5e0b506e18021b6dfdc29907e544632187af666488e44ea14332` |
-| `output/chapter3_windows/data.win` | `6d9af5d08a6b269c5c7b9ee3030d4abbe1e7191e494fb6adf54c1795e5fed58e` |
-| `output/chapter4_windows/data.win` | `db0c75ff12dfa68fe0f89af67690568ae8fe06587d9d6007aaa6e78f7e9390a7` |
-| `output/chapter5_windows/data.win` | `58368524a0aaf48747d425aac58435b6e76bf2c8bd039a2185ed94c1ba82a7af` |
+| `output/chapter1_windows/data.win` | `138023d7d1c4eeedc76487097cbb204c085a727f3b91eac5c91078a0bbf98ff9` |
+| `output/chapter2_windows/data.win` | `4b33fe4c66179b4f9ec73ccb9b31861f71550bc8470e93835cd5a6917102a2c4` |
+| `output/chapter3_windows/data.win` | `52319d6f0060102cec73eeaf27c543422a634401ece4f8b9facf9e9a50de27b7` |
+| `output/chapter4_windows/data.win` | `5de41b573d58a6e3042daee01e818de5baeba3de39cea8d2b6f7334f2f2ec3bc` |
+| `output/chapter5_windows/data.win` | `c4ebafae714e4a93eed62bda7e79739b10ed8f7e8d15ea235691157fd4835364` |
 
 ## Verification
 

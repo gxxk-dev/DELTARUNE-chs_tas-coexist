@@ -77,7 +77,7 @@ else
   check_file "$chs_source/src/deltarunePacker.csproj"
   if git -C "$chs_source" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     actual_commit="$(git -C "$chs_source" rev-parse HEAD)"
-    expected_commit="5f95b0d1d16f80c267eefb6a9ccfd039b0800e0c"
+    expected_commit="5056d2d6cab5ee827c00e8d6becc2dde225be514"
     if [ "$actual_commit" != "$expected_commit" ]; then
       echo "DeltaruneChinese commit mismatch:" >&2
       echo "  expected: $expected_commit" >&2
