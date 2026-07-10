@@ -166,33 +166,66 @@ pub fn apply(
         ));
     }
 
-    // 备份:仅当确有文件需要打补丁时才建;幂等重跑不备份也不覆盖 latest 指针,只备份将被覆盖的文件。
-    let backup_dir = if !opts.backup || to_patch == 0 {
+    let mut keucher_changes = Vec::with_capacity(m.targets.len());
+    for t in &m.targets {
+        let needs_write = if t.data_keucher_win {
+            let rel = Manifest::data_keucher_path(&t.rel)
+                .ok_or_else(|| format!("无法生成 data_keucher.win 路径: {}", t.rel))?;
+            !file_matches_sha256(&game.join(rel), &t.dst_sha256)
+                .map_err(|e| format!("读取 {} 的 data_keucher.win 失败: {e}", t.rel))?
+        } else {
+            false
+        };
+        keucher_changes.push(needs_write);
+    }
+
+    let mut extra_changes = Vec::with_capacity(m.extras.len());
+    for ex in &m.extras {
+        let bytes = assets::get(&ex.asset).ok_or_else(|| format!("内嵌资源缺失: {}", ex.asset))?;
+        let needs_write = !file_matches_bytes(&game.join(&ex.rel), &bytes)
+            .map_err(|e| format!("读取 {} 失败: {e}", ex.rel))?;
+        extra_changes.push(needs_write);
+    }
+
+    let has_changes = to_patch > 0
+        || keucher_changes.iter().any(|needs_write| *needs_write)
+        || extra_changes.iter().any(|needs_write| *needs_write);
+
+    // 备份:仅当确有文件需要改动时才建;幂等重跑不备份也不覆盖 latest 指针。
+    let backup_dir = if !opts.backup || !has_changes {
         None
     } else {
         progress(Progress::Backup);
         let dir = backup::new_backup_dir(game).map_err(|e| format!("创建备份目录失败: {e}"))?;
-        for (t, state) in m.targets.iter().zip(states.iter()) {
-            if !state.needs_patch() {
-                continue;
+        for (index, (t, state)) in m.targets.iter().zip(states.iter()).enumerate() {
+            if state.needs_patch() {
+                backup::backup_rel(game, &dir, &t.rel)
+                    .map_err(|e| format!("备份 {} 失败: {e}", t.rel))?;
             }
-            backup::backup_rel(game, &dir, &t.rel)
-                .map_err(|e| format!("备份 {} 失败: {e}", t.rel))?;
-            if let Some(kw) = Manifest::data_keucher_path(&t.rel) {
-                backup::backup_rel(game, &dir, &kw).map_err(|e| format!("备份 {kw} 失败: {e}"))?;
+            if t.data_keucher_win && keucher_changes[index] {
+                let kw = Manifest::data_keucher_path(&t.rel)
+                    .ok_or_else(|| format!("无法生成 data_keucher.win 路径: {}", t.rel))?;
+                backup_or_record_absent(game, &dir, &kw)?;
             }
         }
-        for ex in &m.extras {
-            backup::backup_rel(game, &dir, &ex.rel)
-                .map_err(|e| format!("备份 {} 失败: {e}", ex.rel))?;
+        for (ex, needs_write) in m.extras.iter().zip(extra_changes.iter()) {
+            if *needs_write {
+                backup_or_record_absent(game, &dir, &ex.rel)?;
+            }
         }
-        backup::record_latest(game, &dir).ok();
+        backup::record_latest(game, &dir).map_err(|e| format!("记录最新备份失败: {e}"))?;
         Some(dir)
     };
 
     // 打补丁
     let total = m.targets.len();
-    for (i, (t, state)) in m.targets.iter().zip(states.iter()).enumerate() {
+    for (i, ((t, state), needs_keucher_write)) in m
+        .targets
+        .iter()
+        .zip(states.iter())
+        .zip(keucher_changes.iter())
+        .enumerate()
+    {
         progress(Progress::Patch {
             rel: t.rel.clone(),
             index: i + 1,
@@ -233,9 +266,7 @@ pub fn apply(
         if t.data_keucher_win {
             if let Some(kw) = Manifest::data_keucher_path(&t.rel) {
                 let kw_path = game.join(&kw);
-                let need = !kw_path.is_file()
-                    || sha256_file(&kw_path).ok().as_deref() != Some(&t.dst_sha256);
-                if need {
+                if *needs_keucher_write {
                     write_atomic(&kw_path, &final_bytes)
                         .map_err(|e| format!("写入 {kw} 失败: {e}"))?;
                 }
@@ -243,12 +274,19 @@ pub fn apply(
         }
     }
 
-    // 外置资源(lang/ 文本、vid/ 视频)
-    if !m.extras.is_empty() {
+    // 外置资源(lang/ 文本、vid/ 视频、mus/ 音频)
+    let extras_to_write = extra_changes
+        .iter()
+        .filter(|needs_write| **needs_write)
+        .count();
+    if extras_to_write > 0 {
         progress(Progress::Extras {
-            count: m.extras.len(),
+            count: extras_to_write,
         });
-        for ex in &m.extras {
+        for (ex, needs_write) in m.extras.iter().zip(extra_changes.iter()) {
+            if !needs_write {
+                continue;
+            }
             let bytes =
                 assets::get(&ex.asset).ok_or_else(|| format!("内嵌资源缺失: {}", ex.asset))?;
             write_atomic(&game.join(&ex.rel), &bytes)
@@ -260,6 +298,31 @@ pub fn apply(
         patched: to_patch,
         backup_dir,
     })
+}
+
+fn backup_or_record_absent(game: &Path, backup_dir: &Path, rel: &str) -> Result<(), String> {
+    if game.join(rel).exists() {
+        backup::backup_rel(game, backup_dir, rel).map_err(|e| format!("备份 {rel} 失败: {e}"))
+    } else {
+        backup::record_absent(game, backup_dir, rel)
+            .map_err(|e| format!("记录待清理路径 {rel} 失败: {e}"))
+    }
+}
+
+fn file_matches_sha256(path: &Path, expected: &str) -> std::io::Result<bool> {
+    match sha256_file(path) {
+        Ok(actual) => Ok(actual == expected),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+fn file_matches_bytes(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
+    match fs::read(path) {
+        Ok(actual) => Ok(actual == expected),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn restore(game: &Path, backup_dir: Option<PathBuf>) -> Result<(PathBuf, u64), String> {

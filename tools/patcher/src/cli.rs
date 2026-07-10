@@ -41,7 +41,7 @@ pub fn apply(
         ));
     }
     if a.all_done() {
-        println!("\n所有 data.win 已是合并版;继续确保 data_keucher.win 与 lang/vid 就位。");
+        println!("\n所有 data.win 已是合并版;继续确保 data_keucher.win 与 lang/vid/mus 就位。");
     }
 
     if !yes && !dry_run {
@@ -73,7 +73,7 @@ pub fn apply(
     let mut cb = |p: Progress| match p {
         Progress::Backup => println!("  备份原文件…"),
         Progress::Patch { rel, index, total } => println!("  [{index}/{total}] {rel}"),
-        Progress::Extras { count } => println!("  铺放 {count} 个 lang/vid 资源…"),
+        Progress::Extras { count } => println!("  铺放 {count} 个 lang/vid/mus 资源…"),
     };
     let rep = engine::apply(&game, ApplyOptions { backup: !no_backup }, &mut cb)?;
 

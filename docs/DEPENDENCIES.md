@@ -23,21 +23,21 @@ export DELTARUNE_GAME_DIR="/path/to/DELTARUNE"
 
 ### Keucher/TAS Mod
 
-本研究使用 Keucher Mod `v5.10.5` 的 PC patches：
+本研究使用 Keucher Mod `v5.10.7` 的 PC patches。官方 Release ZIP（2026-07-09 上传）的 SHA256 为 `1c4499a11cb93c2b8e3d60d4fa0d1bcd15467e5f48581df2333cab0bf8b8fb2b`：
 
 | File | SHA256 |
 | --- | --- |
-| `patch_files/ch5_latest-chapter_select.bps` | `328f7ba64ac3b85e62383015f00930d4d5a0ff8d5a5b7fa3deb64249f4891590` |
-| `patch_files/ch5_latest-chapter1.bps` | `3840d43c0615ebf4ea124c3eab42251ff52f4553eaed49c2a9a2d2504ce249a3` |
-| `patch_files/ch5_latest-chapter2.bps` | `7a8f7e1e4faf0a28373ca8d6ed91aae1f1310d341af3f983560840cb5e315657` |
-| `patch_files/ch5_latest-chapter3.bps` | `7225ddc3b5322da2c86d60ff4c64f0d42b0d5ae08af81caf98f640dde0f2f075` |
-| `patch_files/ch5_latest-chapter4.bps` | `8d7214d79e6f4d59424092c7076614b132cffaf22fb452919dcd393be94a866d` |
-| `patch_files/ch5_latest-chapter5.bps` | `310ee1028c609d854d8816187cfad4e0c16b79b44b55d964e807465c947d218e` |
+| `patch_files/ch5_latest-chapter_select.bps` | `77fb87c615264138b595752ceadcb652e2b2a3860fb7ae7b11871feec0225a21` |
+| `patch_files/ch5_latest-chapter1.bps` | `014c730c165c75f97abfb99c72a35c5770f67c99dae8b1b0a8cfc5b560103ff5` |
+| `patch_files/ch5_latest-chapter2.bps` | `ea84926aa491acf77bde18ba8f550de3c570f405e4aa85e4c27e408371f5b7c9` |
+| `patch_files/ch5_latest-chapter3.bps` | `249e5af31336ccb550905e6850696bab25caac49e208f63779b8a86ba98e5986` |
+| `patch_files/ch5_latest-chapter4.bps` | `6806801a189e0d6486cef614ea85af15a12d8a4bee007c7ef5d76fbfb732db9a` |
+| `patch_files/ch5_latest-chapter5.bps` | `48071d643504e9fd21989719e689dcda3744de0fd7db009cf79c64566960fcbe` |
 
 默认脚本使用环境变量：
 
 ```bash
-export KEUCHER_MOD_DIR="/path/to/Keucher.Mod.v5.10.5"
+export KEUCHER_MOD_DIR="/path/to/Keucher.Mod.v5.10.7"
 ```
 
 ### DeltaruneChinese source

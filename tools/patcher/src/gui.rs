@@ -170,7 +170,10 @@ impl App {
             .map(|m| {
                 let c = &m.deltarune_chinese_commit;
                 let short = &c[..c.len().min(7)];
-                format!("内置补丁 · Keucher {} · CHS {}", m.keucher_mod_version, short)
+                format!(
+                    "内置补丁 · Keucher {} · CHS {}",
+                    m.keucher_mod_version, short
+                )
             })
             .unwrap_or_default();
         let mut app = App {
@@ -253,7 +256,7 @@ impl App {
                     Progress::Patch { rel, index, total } => {
                         format!("[{index}/{total}] 打补丁 {rel}")
                     }
-                    Progress::Extras { count } => format!("铺放 {count} 个 lang/vid 资源…"),
+                    Progress::Extras { count } => format!("铺放 {count} 个 lang/vid/mus 资源…"),
                 };
                 done += 1.0;
                 let _ = tx.send(Msg::Progress((done / total).min(0.99)));
@@ -261,18 +264,18 @@ impl App {
                 ctx.request_repaint();
             };
             let result = engine::apply(&game, ApplyOptions { backup }, &mut cb).map(|rep| {
-                if rep.patched == 0 {
+                let mut message = if rep.patched == 0 {
                     "已是最新:所有文件均为 Keucher+CHS 合并版,已确保资源就位。".to_string()
                 } else {
-                    let mut m = format!(
+                    format!(
                         "完成:已对 {} 个 data.win 应用补丁并铺放汉化资源。",
                         rep.patched
-                    );
-                    if let Some(d) = &rep.backup_dir {
-                        m.push_str(&format!("\n原文件已备份到:{}", d.display()));
-                    }
-                    m
+                    )
+                };
+                if let Some(dir) = &rep.backup_dir {
+                    message.push_str(&format!("\n原文件已备份到:{}", dir.display()));
                 }
+                message
             });
             let _ = tx.send(Msg::Progress(1.0));
             let _ = tx.send(Msg::Done(result));

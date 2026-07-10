@@ -30,7 +30,7 @@ pub struct Target {
     pub data_keucher_win: bool,
 }
 
-/// 直接铺放的外置资源(CHS 的 lang/ 文本、vid/ 视频)。
+/// 直接铺放的外置资源(CHS 的 lang/ 文本、vid/ 视频、mus/ 音频)。
 #[derive(Debug, Deserialize)]
 pub struct Extra {
     /// 相对 assets/ 的资源路径。

@@ -1,58 +1,66 @@
+== build provenance ==
+DELTARUNE Chapter 5 baseline: v0.0.247
+Keucher Mod release: v5.10.7
+Keucher Mod source commit: f3437becd845f34ce9cabe2709fb36e7e549a8be
+Keucher Mod release ZIP SHA256: 1c4499a11cb93c2b8e3d60d4fa0d1bcd15467e5f48581df2333cab0bf8b8fb2b
+DeltaruneChinese commit: 824524b6c86b4b902ba13ee6c5483f3cfeef3cec
+
 == final output SHA256 ==
-1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954  output/data.win
-b59769498ac449a94abce4fc5b7cd597db997f3698512909b38c6eab62f7b6f6  output/chapter1_windows/data.win
-6e47f7ad27437af4c212ab555093ab43ba17b1e7e5f1778bd6a2cb2372eae49a  output/chapter2_windows/data.win
-ecc9a892443b058803dcd86924e37d6a01020837f58a2c3868191122172d057e  output/chapter3_windows/data.win
-cdd5a178448519d33e73f945d3651ed63c24c310fd701dbf796e44ef74ef2260  output/chapter4_windows/data.win
-a0627060906e9e1630ff76969bbaf2d11c078db57797c829f104b2b00cb1299d  output/chapter5_windows/data.win
+548d07d75812ae04d218dd342cc06404a30c7fe57d70bbf2e7c54b71d036286f  output/data.win
+9869fc61101c3cdcd2aad998892fa94c4778827eec63f9a1128d8f01c5206629  output/chapter1_windows/data.win
+123372dba8e3a22820b3a14a25fb391cf8ac3b67ba10a79ecb5a708cad6fc0a8  output/chapter2_windows/data.win
+ad8cb83f6ea183577e5107fd02b31acf1ff2b566a6e413397a99d5850bc50b9e  output/chapter3_windows/data.win
+27682b6460e76c6759b7ac79f24e58eedcfe06c5dc96bb912e1658409b00c6a8  output/chapter4_windows/data.win
+476530adcf491ce592d65f9ecba80f500c8ac3994b2ddb494acbf05c2911c470  output/chapter5_windows/data.win
 
-== installed layout checks ==
-not_reinstalled_after_824524b_rebuild
-run ./install_output.sh "$DELTARUNE_GAME_DIR" to install the rebuilt output and refresh installed layout checks
-
-== feature checks ==
-keucher_strings_present:
-- data_keucher.win
-- Keucher Mod
-- obj_savestate_manager
-- Welcome to Keucher Mod!
-
-chs_external_resources_present:
+== external resources ==
 - chapter1_windows/lang
 - chapter2_windows/lang
 - chapter3_windows/lang
 - chapter3_windows/vid
 - chapter4_windows/lang
 - chapter5_windows/lang
+- chapter5_windows/mus/ch5_intro_audio.ogg
 - chapter5_windows/vid
+- root mus/ch5_intro_audio.ogg and vid/ch5_intro_*.mp4 fallbacks
 
-== code conflict check ==
-no_merged_lost_keucher_entries_after_manual_fixes
+== savestates v2.1 checks ==
+- Chapter 1-5 use the v2 manager and game_display_name save directory layout.
+- Legacy v1 manager imports are removed before running the CHS packer.
+- Constructor names are restored through asset_get_index(arg0.const_func).
+- CHS-replaced code has loading guards and logged-call instrumentation reapplied.
+- Readable-room Step has a safe manager guard and myinteract fallback.
+- Audio lookup, DS high-water tracking, priority-queue copy, call_later cleanup,
+  imported-sprite cleanup, and DS destruction fixes are present.
 
-== required manual fixes ==
-chapter1_to_5:gml_Object_obj_initializer2_Create_0:
-- keep obj_savestate_manager.loading guard
-- keep mod_init() call
+== Chapter 5 v0.0.247 checks ==
+- Credits contain Concept Art, Platforming VFX, and Musical Assistance updates.
+- Cliff-scene interjection fixes are retained.
+- global.versionno is v0.0.247 in all three initializer branches.
+- Terracota turn timers are 275, 245, and 365.
+- Flowery boss practice and graze-reset changes from f3437be are retained.
+- obj_savestate_manager is resolved by name and kept persistent by mod_init().
+- Pause and obj_time loading checks are safe when the manager is absent.
+- Vanilla GIF-recording calls are absent from obj_time Draw 77.
 
-chapter5:gml_Object_obj_town_event_Create_0:
-- keep obj_savestate_manager.loading guard
+== code conflict scan ==
+code lists: verify/code_lists_v5.10.7/*.txt (175 CHS import targets)
+reports: verify/code_conflicts_v5.10.7/*.tsv
+result: no merged_lost_keucher entries
 
-chapter1_to_5:gml_Object_obj_savestate_manager_Create_0:
-- apply scripts/apply_keucher_savestate_hotfix.sh
-- constructor restore uses method(undefined, const_func) before new
-- prevents obj_savestate_manager Alarm 0 crash: Trying to construct something that isn't a function
+== installation status ==
+The rebuilt output was not copied into a real game installation during validation.
+Use the generated installer or ./install_output.sh "$DELTARUNE_GAME_DIR" when ready;
+both installation paths create or support backups before replacing game files.
 
-chapter1_to_5:gml_Object_obj_readable_room1_Step_0:
-- apply scripts/apply_keucher_savestate_hotfix.sh
-- skip Step while obj_savestate_manager.loading is true
-- initialize missing myinteract to 0 before reading it
-- prevents obj_readable_room1 Step crash: Variable obj_readable_room1.myinteract not set before reading it
+The installer was exercised in isolated copies of the v0.0.247 vanilla tree:
+- apply produced all six expected hashes, five matching data_keucher.win copies,
+  and all 23 external-resource mappings;
+- restore returned all six data.win files to vanilla and removed files/directories
+  that did not exist before installation;
+- auxiliary-only repair backed up an existing user file, filled missing resources,
+  and restored both the user file and the original absence state correctly.
 
-chapter5:pause/savestate manager:
-- apply scripts/apply_ch5_pause_savestate_hotfix.sh
-- keep obj_savestate_manager in mod_init() omnipresent instances
-- guard obj_pause_emulator_Create_0, obj_time_Create_0, and obj_time_Step_1 before reading obj_savestate_manager.loading
-- prevents boss-room Pause crash: Unable to find any instance for object index 1742 name obj_savestate_manager
-
-== latest install backup ==
-not_updated_by_824524b_rebuild
+== local deliverables (gitignored) ==
+f4a68db4f920f0b6ff5c066d58bc413184b40362b34bb21f7e0e0c846248d296  dist/dr-tas-chs-linux-x86_64-for-vanilla-0.0.247
+37b00e1bc3f4cbde3ef5c91ab1cda48f6ed2bc4298db4d6db9dd3554f64cf023  dist/dr-tas-chs-patchset-for-vanilla-0.0.247.zip

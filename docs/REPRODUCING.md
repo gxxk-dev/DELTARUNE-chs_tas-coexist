@@ -1,98 +1,86 @@
 # Reproducing the Research Build
 
-这份说明记录研究复现路线。仓库不包含游戏资产、Mod patches、CHS release data 或最终 `data.win`。
+这份说明记录 Keucher Mod `v5.10.7`、DeltaruneChinese `824524b` 与 DELTARUNE Chapter 5 `v0.0.247` 的共存构建路线。仓库不包含游戏资产、第三方补丁或最终 `data.win`。
 
 ## High-level process
 
-1. 从正版 DELTARUNE 读取原始 `data.win` files。
-2. 使用 Keucher/TAS Mod 的 `.bps` patches 生成 TAS baseline。
-3. 使用 DeltaruneChinese packer，以 TAS baseline 作为输入导入 CHS resources。
-4. 对冲突 GML 保留 Keucher/TAS runtime hooks，并应用本仓库记录的 Keucher savestate/pause hotfix。
-5. 将合并后的 chapter `data.win` 同时安装为 `data_keucher.win`，因为 Keucher chapter select 会加载这个文件。
+1. 从正版 DELTARUNE `v0.0.247` 读取原始 `data.win` files。
+2. 应用 Keucher Mod `v5.10.7` PC `.bps`，生成 main 与 Chapter 1-5 baseline。
+3. 把 baseline 放入 DeltaruneChinese workspace，并运行 `scripts/apply_keucher_savestate_hotfix.sh`：移除会把 Savestates v2.1 降回 v1 的旧 manager import，同时保留 initializer、town event 与 readable-room hooks。
+4. 运行 `scripts/apply_ch5_v0247_compat.sh`，把 DELTARUNE Ch5 `v0.0.247` 的 4 组更新合入 CHS imports。
+5. 用 DeltaruneChinese packer 导入中文代码、字体、贴图和文本。
+6. 对 packer result 运行 `scripts/reinstrument_keucher_savestate_v2.sh`，恢复被 CHS `QueueReplace` 覆盖的 logged calls 与 loading guards。
+7. 依次运行 Savestates v2.1 performance、Ch5 pause 和 Ch5 rhythm font hotfix。
+8. 将每章最终 `data.win` 同时安装为 `data_keucher.win`。
 
-## Important merge notes
+## Savestates v2.1
 
-已确认的关键点：
+`v5.10.7` 把 savestate 实现从 `src/mod/common/_savestates` 移到独立的 `src/savestate`，并由 `BuildSavestate()` 显式注入。旧版 `gml_Object_obj_savestate_manager_Create_0.gml` import 不能继续使用，否则 CHS packer 会把整个 v2 manager 覆盖回 v1。
 
-- 直接把 CHS `.xdelta` 应用于 Keucher/TAS `data.win` 会因为 xdelta checksum 不匹配失败。
-- Chapter 1-5 的 `gml_Object_obj_initializer2_Create_0` 必须保留 Keucher/TAS 的 savestate guard：
+新版 constructor 以名称保存并通过 `asset_get_index(arg0.const_func)` 恢复，不再应用旧的 `method(undefined, const_func)` 补丁。仍需保留：
 
-```gml
-if (obj_savestate_manager.loading)
-{
-    exit;
-}
-```
+- `obj_readable_room1` Step 的 loading guard 与 `myinteract` fallback。
+- CHS imports 中 Create/BeginStep/RoomStart/PreCreate 的 loading guard。
+- CHS imports 中 audio/DS/sprite/path/JSON/call_later 的 logged wrappers。
+- Ch5 boss room 的 persistent manager 与安全存在性检查。
 
-- Chapter 1-5 的 `gml_Object_obj_initializer2_Create_0` 必须调用：
+`scripts/apply_savestate_performance_hotfix.sh` 已按 v2 事件职责重写：Create 维护音频/DS/sprite 基线，Alarm 0 修 call_later，Step Begin 保存，Alarm 1 读取与清理。
 
-```gml
-mod_init();
-```
+## Chapter 5 v0.0.247
 
-缺少 `mod_init();` 会导致进入章节时 `obj_time` 读取未初始化的 `global.debug_keybinds_on` 并崩溃。
+官方 `v5.10.7` Release 资产在 2026-07-09 重新生成，目标 Ch5 已是 `v0.0.247`。DeltaruneChinese `824524b` 的部分 imports 仍基于较早版本，因此 `scripts/apply_ch5_v0247_compat.sh` 合并：
 
-- Chapter 5 的 `gml_Object_obj_town_event_Create_0` 也需要保留 savestate loading guard。
-- Chapter 1-5 需要应用 `scripts/apply_keucher_savestate_hotfix.sh`：
+- 更新 credits（Concept Art、Platforming VFX、Musical Assistance）。
+- 悬崖场景的两处 `interjection = -1`（汉化源已包含，脚本验证）。
+- initializer 的 `global.versionno = "v0.0.247"`。
+- Terracota 三处 turn timer：`275`、`245`、`365`。
 
-```bash
-./scripts/apply_keucher_savestate_hotfix.sh work/DeltaruneChinese-260707/workspace build/keucher
-```
-
-这个 hotfix 会导入两处 Keucher code 修正：
-
-- `gml_Object_obj_savestate_manager_Create_0`：保留 Keucher 原始 savestate manager，但在 `decode_var_info()` 还原 constructor 时先把 JSON 里的 numeric script asset id 转成 callable method，再调用 `new`。否则读取包含 constructor struct 的 savestate 会在 `obj_savestate_manager` Alarm 0 报 `Trying to construct something that isn't a function`。
-- `gml_Object_obj_readable_room1_Step_0`：在 `obj_savestate_manager.loading` 期间直接 `exit`，并兜底初始化缺失的 `myinteract`。否则从非对话场景读取一个保存于对话中的 savestate 时，目标房间实例可能在 Alarm 0 写回保存变量前先跑 Step，并报 `Variable obj_readable_room1.myinteract not set before reading it`。
-
-- Chapter 5 需要应用 `scripts/apply_ch5_pause_savestate_hotfix.sh`：
+## Commands
 
 ```bash
+# baseline 已由 v5.10.7 BPS 生成到 build/keucher-v5.10.7
+./scripts/apply_keucher_savestate_hotfix.sh \
+  work/DeltaruneChinese-keucher-v5.10.7/workspace \
+  build/keucher-v5.10.7
+./scripts/apply_ch5_v0247_compat.sh \
+  work/DeltaruneChinese-keucher-v5.10.7/workspace
+
+# 在 DeltaruneChinese worktree 根运行 packer
+dotnet build -c Release src
+dotnet src/bin/Release/net10.0/deltarunePacker.dll workspace
+
+./scripts/reinstrument_keucher_savestate_v2.sh \
+  work/DeltaruneChinese-keucher-v5.10.7/workspace
+./scripts/apply_savestate_performance_hotfix.sh output
 ./scripts/apply_ch5_pause_savestate_hotfix.sh output/chapter5_windows/data.win
+./scripts/apply_ch5_rhythm_evaluation_font_hotfix.sh output/chapter5_windows/data.win
 ```
-
-这个 hotfix 会让 `gml_GlobalScript_mod_init` 创建并持久化 `obj_savestate_manager`，同时给 `obj_pause_emulator_Create_0`、`obj_time_Create_0` 和 `obj_time_Step_1` 的 `obj_savestate_manager.loading` 读取加上存在性检查。否则某些 boss 战房间 Pause 时会报 `Unable to find any instance for object index '1742' name 'obj_savestate_manager'`。
-
-- 每个 `chapterN_windows/data_keucher.win` 应与对应的 merged `chapterN_windows/data.win` byte-for-byte 一致。
 
 ## Expected final output hashes
 
-当前成功构建的 final output SHA256：
-
 | File | SHA256 |
 | --- | --- |
-| `output/data.win` | `1431831521882ba858811a3ed8112d9d06fdbfa189ace407c5ec95082ea7c954` |
-| `output/chapter1_windows/data.win` | `b59769498ac449a94abce4fc5b7cd597db997f3698512909b38c6eab62f7b6f6` |
-| `output/chapter2_windows/data.win` | `6e47f7ad27437af4c212ab555093ab43ba17b1e7e5f1778bd6a2cb2372eae49a` |
-| `output/chapter3_windows/data.win` | `ecc9a892443b058803dcd86924e37d6a01020837f58a2c3868191122172d057e` |
-| `output/chapter4_windows/data.win` | `cdd5a178448519d33e73f945d3651ed63c24c310fd701dbf796e44ef74ef2260` |
-| `output/chapter5_windows/data.win` | `a0627060906e9e1630ff76969bbaf2d11c078db57797c829f104b2b00cb1299d` |
+| `output/data.win` | `548d07d75812ae04d218dd342cc06404a30c7fe57d70bbf2e7c54b71d036286f` |
+| `output/chapter1_windows/data.win` | `9869fc61101c3cdcd2aad998892fa94c4778827eec63f9a1128d8f01c5206629` |
+| `output/chapter2_windows/data.win` | `123372dba8e3a22820b3a14a25fb391cf8ac3b67ba10a79ecb5a708cad6fc0a8` |
+| `output/chapter3_windows/data.win` | `ad8cb83f6ea183577e5107fd02b31acf1ff2b566a6e413397a99d5850bc50b9e` |
+| `output/chapter4_windows/data.win` | `27682b6460e76c6759b7ac79f24e58eedcfe06c5dc96bb912e1658409b00c6a8` |
+| `output/chapter5_windows/data.win` | `476530adcf491ce592d65f9ecba80f500c8ac3994b2ddb494acbf05c2911c470` |
 
 ## Verification
 
-Compact verification records are in:
-
-- `verify/final_audit.txt`
-- `verify/code_conflicts_fast_after/*.tsv`
-- `verify/code_lists/*.txt`
-
-Run local asset checks:
-
 ```bash
 ./scripts/verify_local_assets.sh
-```
-
-Run code conflict scan after rebuilding local `work/` and `build/` directories:
-
-```bash
 ./scripts/check_code_conflicts.sh
+./scripts/verify_merged_output.sh output
 ```
+
+新版报告保存在 `verify/code_conflicts_v5.10.7/*.tsv` 与 `verify/code_lists_v5.10.7/*.txt`。175 个 CHS import 目标没有 `merged_lost_keucher` 条目。
 
 ## Installing local output
-
-After recreating `output/`, install with:
 
 ```bash
 ./install_output.sh "$DELTARUNE_GAME_DIR"
 ```
 
-The script creates a timestamped local backup in `backups/` before copying files.
+安装脚本会先在 `backups/` 创建带时间戳的本地备份。

@@ -38,7 +38,7 @@ patch_loading_guard() {
     local gml_file="$tmp_dir/${code_name}.gml"
 
     dotnet run --project "$probe_project" -- decompile "$output_win" "$code_name" > "$gml_file"
-    perl -0pi -e 's/if \((?:instance_exists\((?:obj_savestate_manager|1742)\) && )?obj_savestate_manager\.loading\)/if (instance_exists(obj_savestate_manager) && obj_savestate_manager.loading)/g' "$gml_file"
+    perl -0pi -e 's/if \((?:instance_exists\((?:obj_savestate_manager|[0-9]+)\) && )?(?:obj_savestate_manager|[0-9]+)\.loading\)/if (instance_exists(obj_savestate_manager) && obj_savestate_manager.loading)/g' "$gml_file"
     if ! rg -q "instance_exists\\(obj_savestate_manager\\).*obj_savestate_manager\\.loading" "$gml_file"; then
         echo "Failed to patch loading guard in $code_name" >&2
         exit 1
@@ -46,16 +46,22 @@ patch_loading_guard() {
     dotnet run --project "$probe_project" -- replace-code "$output_win" "$code_name" "$gml_file" "$output_win"
 }
 
+manager_id="$(dotnet run --project "$probe_project" -- object-index "$output_win" obj_savestate_manager)"
+if [[ ! "$manager_id" =~ ^[0-9]+$ ]]; then
+    echo "Failed to resolve obj_savestate_manager object index" >&2
+    exit 1
+fi
+
 mod_init="$tmp_dir/gml_GlobalScript_mod_init.gml"
 dotnet run --project "$probe_project" -- decompile "$output_win" gml_GlobalScript_mod_init > "$mod_init"
-if ! rg -q "create_array\\([^)]*1742" "$mod_init"; then
-    if ! rg -q "create_array\\(1735, 1736, 1738, 1740\\)" "$mod_init"; then
+if ! rg -q "create_array\\([^)]*([^0-9]|^)${manager_id}([^0-9]|$)" "$mod_init"; then
+    if ! rg -q "var omnipresent_instances = create_array\\([^)]*\\);" "$mod_init"; then
         echo "Expected Ch5 Keucher omnipresent instance list not found in mod_init" >&2
         exit 1
     fi
-    perl -0pi -e 's/create_array\(1735, 1736, 1738, 1740\)/create_array(1735, 1736, 1738, 1740, 1742)/' "$mod_init"
+    MANAGER_ID="$manager_id" perl -0pi -e 's/(var omnipresent_instances = create_array\()([^)]*)(\);)/$1$2, $ENV{MANAGER_ID}$3/' "$mod_init"
 fi
-if ! rg -q "create_array\\([^)]*1742" "$mod_init"; then
+if ! rg -q "create_array\\([^)]*([^0-9]|^)${manager_id}([^0-9]|$)" "$mod_init"; then
     echo "Failed to add obj_savestate_manager to mod_init" >&2
     exit 1
 fi

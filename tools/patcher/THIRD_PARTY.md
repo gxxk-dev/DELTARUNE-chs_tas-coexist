@@ -4,10 +4,10 @@
 
 ## 内嵌的补丁数据(第三方派生)
 
-内嵌的 `*.xdelta` 是「纯净 vanilla `data.win`」到「Keucher Mod + CHS 合并结果」的二进制差分,`lang/`、`vid/` 是 CHS 的外置资源。这些数据派生自:
+内嵌的 `*.xdelta` 是「纯净 vanilla `data.win`」到「Keucher Mod + CHS 合并结果」的二进制差分,`lang/`、`vid/`、`mus/` 是 CHS 的外置资源。这些数据派生自:
 
 - **DELTARUNE** © Toby Fox / 8-4。游戏本体不被分发;补丁只能应用到用户自有的、版本匹配的纯净安装。
-- **Keucher Mod**(`v5.10.5`)。savestate 与运行时钩子改动。版权归其作者。
+- **Keucher Mod**(`v5.10.7`, commit `f3437becd845f34ce9cabe2709fb36e7e549a8be`)。savestate 与运行时钩子改动。版权归其作者。
 - **DeltaruneChinese / CHS 汉化**(<https://github.com/gm3dr/DeltaruneChinese>,commit `824524b6c86b4b902ba13ee6c5483f3cfeef3cec`)。中文文本、字体、贴图、图集等。版权归汉化组。
 
 > 分发内嵌这些差分的二进制,等于再分发上述第三方的派生作品。请在发布前确认你已获得相应授权或许可。

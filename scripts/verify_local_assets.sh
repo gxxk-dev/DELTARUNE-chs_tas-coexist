@@ -50,12 +50,12 @@ if [ -z "$keucher" ]; then
   echo "KEUCHER_MOD_DIR is not set" >&2
   fail=1
 else
-  check_sha256 328f7ba64ac3b85e62383015f00930d4d5a0ff8d5a5b7fa3deb64249f4891590 "$keucher/patch_files/ch5_latest-chapter_select.bps"
-  check_sha256 3840d43c0615ebf4ea124c3eab42251ff52f4553eaed49c2a9a2d2504ce249a3 "$keucher/patch_files/ch5_latest-chapter1.bps"
-  check_sha256 7a8f7e1e4faf0a28373ca8d6ed91aae1f1310d341af3f983560840cb5e315657 "$keucher/patch_files/ch5_latest-chapter2.bps"
-  check_sha256 7225ddc3b5322da2c86d60ff4c64f0d42b0d5ae08af81caf98f640dde0f2f075 "$keucher/patch_files/ch5_latest-chapter3.bps"
-  check_sha256 8d7214d79e6f4d59424092c7076614b132cffaf22fb452919dcd393be94a866d "$keucher/patch_files/ch5_latest-chapter4.bps"
-  check_sha256 310ee1028c609d854d8816187cfad4e0c16b79b44b55d964e807465c947d218e "$keucher/patch_files/ch5_latest-chapter5.bps"
+  check_sha256 77fb87c615264138b595752ceadcb652e2b2a3860fb7ae7b11871feec0225a21 "$keucher/patch_files/ch5_latest-chapter_select.bps"
+  check_sha256 014c730c165c75f97abfb99c72a35c5770f67c99dae8b1b0a8cfc5b560103ff5 "$keucher/patch_files/ch5_latest-chapter1.bps"
+  check_sha256 ea84926aa491acf77bde18ba8f550de3c570f405e4aa85e4c27e408371f5b7c9 "$keucher/patch_files/ch5_latest-chapter2.bps"
+  check_sha256 249e5af31336ccb550905e6850696bab25caac49e208f63779b8a86ba98e5986 "$keucher/patch_files/ch5_latest-chapter3.bps"
+  check_sha256 6806801a189e0d6486cef614ea85af15a12d8a4bee007c7ef5d76fbfb732db9a "$keucher/patch_files/ch5_latest-chapter4.bps"
+  check_sha256 48071d643504e9fd21989719e689dcda3744de0fd7db009cf79c64566960fcbe "$keucher/patch_files/ch5_latest-chapter5.bps"
 fi
 
 if [ -z "$chs" ]; then

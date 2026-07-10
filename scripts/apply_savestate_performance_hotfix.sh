@@ -59,81 +59,91 @@ patch_code() {
 
     case "$code_name" in
         gml_Object_obj_savestate_manager_Create_0)
-            perl -0pi -e 's/(function encode_data_type\(arg0\)\n\{\n\s*var value = arg0;\n\s*var type = typeof\(value\);\n)\s*var sound_ids = variable_struct_get_names\(playing_sounds\);\n/$1/s' "$gml_file"
-            perl -0pi -e 's/array_contains_manual\(sound_ids, value\)/variable_struct_exists(playing_sounds, value)/g' "$gml_file"
-            if ! rg -q "function refresh_ds_max_ids\\(" "$gml_file"; then
-                perl -0pi -e 's/(function encode_data_type\(arg0\)\n\{)/function refresh_ds_max_ids()\n{\n    var i = ds_max_id.list;\n    while (i >= 0 && !ds_exists(i, 2))\n    {\n        i--;\n    }\n    ds_max_id.list = i;\n    i = ds_max_id.map;\n    while (i >= 0 && !ds_exists(i, 1))\n    {\n        i--;\n    }\n    ds_max_id.map = i;\n    i = ds_max_id.pqueue;\n    while (i >= 0 && !ds_exists(i, 6))\n    {\n        i--;\n    }\n    ds_max_id.pqueue = i;\n}\n\n$1/s' "$gml_file"
-            fi
-            if ! rg -q "base_imported_sprite_start" "$gml_file"; then
-                perl -0pi -e 's/(highest_known_import_spr_id = imported_sprite_start - 1;)/base_imported_sprite_start = imported_sprite_start;\n$1/s' "$gml_file"
-            fi
-            perl -0pi -e 's/function set_globals\(arg0, arg1 = false, arg2 = true\)/function set_globals(arg0, arg1 = false, arg2 = true, arg3 = true)/g' "$gml_file"
-            if ! rg -q "if \\(!arg3\\)" "$gml_file"; then
-                perl -0pi -e 's/(\n\s*var ds = load_game_info\.ds;)/\n    if (!arg3)\n    {\n        exit;\n    }\n$1/s' "$gml_file"
-            fi
-            perl -0pi -e 's/ds_exists\(i, 2\)(\s*\)\s*\{\s*ds_list_destroy\(lists_to_destroy\[i\]\);)/ds_exists(lists_to_destroy[i], 2)$1/sg' "$gml_file"
-            perl -0pi -e 's/ds_exists\(i, 1\)(\s*\)\s*\{\s*ds_map_destroy\(maps_to_destroy\[i\]\);)/ds_exists(maps_to_destroy[i], 1)$1/sg' "$gml_file"
-            perl -0pi -e 's/ds_exists\(i, 6\)(\s*\)\s*\{\s*ds_priority_destroy\(pqueues_to_destroy\[i\]\);)/ds_exists(pqueues_to_destroy[i], 6)$1/sg' "$gml_file"
-            if ! rg -q "refresh_ds_max_ids\\(\\);\\s*if \\(!pqueues_logged\\)" "$gml_file"; then
-                perl -0pi -e 's/(\n\s*if \(!pqueues_logged\)\n\s*\{)/\n    refresh_ds_max_ids();$1/s' "$gml_file"
-            fi
-            if ! rg -U -q "refresh_ds_max_ids\\(\\);\\s*\\n\\}\\s*\\n\\s*function update_audio_info" "$gml_file"; then
-                perl -0pi -e 's/\n\}\n\nfunction update_audio_info\(\)\n\{/\n    refresh_ds_max_ids();\n}\n\nfunction update_audio_info()\n{/s' "$gml_file"
-            fi
-            if ! rg -U -q "function update_audio_info\\(\\)\\s*\\n\\{\\s*\\n\\s*var sound_ids = variable_struct_get_names\\(playing_sounds\\);" "$gml_file"; then
-                perl -0pi -e 's/(function update_audio_info\(\)\n\{\n)/$1    var sound_ids = variable_struct_get_names(playing_sounds);\n/s' "$gml_file"
-            fi
-            perl -0pi -e 's/set_globals\(load_game_info\.globals, false, false\);/set_globals(load_game_info.globals, false, false, false);/g' "$gml_file"
-            if rg -q "array_contains_manual\\(sound_ids, value\\)" "$gml_file" || ! rg -q "variable_struct_exists\\(playing_sounds, value\\)" "$gml_file"; then
-                echo "Failed to patch audio lookup in $data_win" >&2
+            if ! rg -q "function decode_data_type\\(" "$gml_file" || ! rg -q "game_display_name" "$gml_file"; then
+                echo "Expected Keucher savestate v2 Create event not found in $data_win" >&2
                 exit 1
             fi
-            if ! rg -q "function refresh_ds_max_ids\\(" "$gml_file" ||
-                ! rg -q "function set_globals\\(arg0, arg1 = false, arg2 = true, arg3 = true\\)" "$gml_file" ||
-                ! rg -q "ds_exists\\(lists_to_destroy\\[i\\], 2\\)" "$gml_file" ||
-                ! rg -q "ds_exists\\(maps_to_destroy\\[i\\], 1\\)" "$gml_file" ||
-                ! rg -q "ds_exists\\(pqueues_to_destroy\\[i\\], 6\\)" "$gml_file" ||
-                ! rg -q "var sound_ids = variable_struct_get_names\\(playing_sounds\\);" "$gml_file"; then
-                echo "Failed to patch DS rebuild cleanup in $data_win" >&2
+
+            if rg -q "array_contains_manual\\(sound_ids, string\\(value\\)\\)" "$gml_file"; then
+                perl -0pi -e 's/\n\s*var sound_ids = variable_struct_get_names\(current_sounds\);\n/\n/' "$gml_file"
+                perl -0pi -e 's/array_contains_manual\(sound_ids, string\(value\)\)/variable_struct_exists(current_sounds, string(value))/g' "$gml_file"
+            fi
+
+            if ! rg -q "function refresh_ds_max_ids\\(" "$gml_file"; then
+                perl -0pi -e 's/(function encode_data_type\(arg0, arg1 = true\)\n\{)/function refresh_ds_max_ids()\n{\n    var i = ds_max_id.list;\n    while (i >= 0 && !ds_exists(i, 2))\n    {\n        i--;\n    }\n    ds_max_id.list = i;\n    i = ds_max_id.map;\n    while (i >= 0 && !ds_exists(i, 1))\n    {\n        i--;\n    }\n    ds_max_id.map = i;\n    i = ds_max_id.pqueue;\n    while (i >= 0 && !ds_exists(i, 6))\n    {\n        i--;\n    }\n    ds_max_id.pqueue = i;\n}\n\n$1/s' "$gml_file"
+            fi
+
+            if ! rg -q "base_imported_sprite_start" "$gml_file"; then
+                perl -0pi -e 's/(highest_known_import_spr_id = imported_sprite_start - 1;)/base_imported_sprite_start = imported_sprite_start;\n$1/' "$gml_file"
+            fi
+
+            if rg -q "array_contains_manual\\(sound_ids, string\\(value\\)\\)" "$gml_file" ||
+                ! rg -q "variable_struct_exists\\(current_sounds, string\\(value\\)\\)" "$gml_file" ||
+                ! rg -q "function refresh_ds_max_ids\\(" "$gml_file" ||
+                ! rg -q "base_imported_sprite_start = imported_sprite_start" "$gml_file" ||
+                ! rg -U -q "function update_audio_info\\(\\)\\s*\\n\\{\\s*\\n\\s*var sound_ids = variable_struct_get_names\\(current_sounds\\);" "$gml_file"; then
+                echo "Failed to patch savestate v2 Create event in $data_win" >&2
                 exit 1
             fi
             ;;
-        gml_Object_obj_savestate_manager_Step_1)
+
+        gml_Object_obj_savestate_manager_Alarm_0)
             perl -0pi -e 's/array_delete\(known_call_laters, c_later, 1\)/array_delete(known_call_laters, i, 1)/g' "$gml_file"
-            if rg -q "array_delete\\(known_call_laters, c_later, 1\\)" "$gml_file" || ! rg -q "array_delete\\(known_call_laters, i, 1\\)" "$gml_file"; then
+            if rg -q "array_delete\\(known_call_laters, c_later, 1\\)" "$gml_file" ||
+                ! rg -q "array_delete\\(known_call_laters, i, 1\\)" "$gml_file"; then
                 echo "Failed to patch call_later cleanup in $data_win" >&2
                 exit 1
             fi
             ;;
-        gml_Object_obj_savestate_manager_Alarm_1)
-            if ! rg -q "refresh_ds_max_ids\\(\\);" "$gml_file"; then
-                perl -0pi -e 's/(\nvar ds_lists = \[\];)/\nrefresh_ds_max_ids();$1/s' "$gml_file"
+
+        gml_Object_obj_savestate_manager_Step_1)
+            if ! rg -U -q "refresh_ds_max_ids\\(\\);\\s*\\nvar ds_lists = \\[\\];" "$gml_file"; then
+                perl -0pi -e 's/(\nvar ds_lists = \[\];)/\nrefresh_ds_max_ids();$1/' "$gml_file"
             fi
             perl -0pi -e 's/var pqueue_copy = ds_priority_create_logged\(\);/var pqueue_copy = ds_priority_create();/g' "$gml_file"
-            if rg -q "pqueue_copy = ds_priority_create_logged\\(\\)" "$gml_file" || ! rg -q "pqueue_copy = ds_priority_create\\(\\)" "$gml_file" || ! rg -q "refresh_ds_max_ids\\(\\);" "$gml_file"; then
-                echo "Failed to patch pqueue copy in $data_win" >&2
+            if ! rg -U -q "refresh_ds_max_ids\\(\\);\\s*\\nvar ds_lists = \\[\\];" "$gml_file" ||
+                rg -q "pqueue_copy = ds_priority_create_logged\\(\\)" "$gml_file" ||
+                ! rg -q "pqueue_copy = ds_priority_create\\(\\)" "$gml_file"; then
+                echo "Failed to patch savestate v2 save event in $data_win" >&2
                 exit 1
             fi
             ;;
-        gml_Object_obj_savestate_manager_Alarm_0)
+
+        gml_Object_obj_savestate_manager_Alarm_1)
             if ! rg -q "old_imported_sprite_id" "$gml_file"; then
-                perl -0pi -e 's/(var sprite_folder = savestate_dir\(\) \+ "Sprites\/";)/$1\nfor (var old_imported_sprite_id = base_imported_sprite_start; old_imported_sprite_id <= highest_known_import_spr_id; old_imported_sprite_id++)\n{\n    if (sprite_exists(old_imported_sprite_id))\n    {\n        sprite_delete(old_imported_sprite_id);\n    }\n}\nimported_sprite_start = base_imported_sprite_start;\nhighest_known_import_spr_id = base_imported_sprite_start - 1;/s' "$gml_file"
+                perl -0pi -e 's/(var sprite_folder = savestate_dir\(\) \+ "Sprites\/";)/$1\nfor (var old_imported_sprite_id = base_imported_sprite_start; old_imported_sprite_id <= highest_known_import_spr_id; old_imported_sprite_id++)\n{\n    if (sprite_exists(old_imported_sprite_id))\n    {\n        sprite_delete(old_imported_sprite_id);\n    }\n}\nimported_sprite_start = base_imported_sprite_start;\nhighest_known_import_spr_id = base_imported_sprite_start - 1;/' "$gml_file"
             fi
             if ! rg -q "highest_known_import_spr_id = imported_sprite_ids\\[0\\]" "$gml_file"; then
-                perl -0pi -e 's/(imported_sprite_start = imported_sprite_ids\[0\];)/$1\n    highest_known_import_spr_id = imported_sprite_ids[0];/s' "$gml_file"
+                perl -0pi -e 's/(imported_sprite_start = imported_sprite_ids\[0\];)/$1\n    highest_known_import_spr_id = imported_sprite_ids[0];/' "$gml_file"
             fi
             if ! rg -q "imported_sprite_ids\\[i\\] > highest_known_import_spr_id" "$gml_file"; then
-                perl -0pi -e 's/(\n\s*if \(imported_sprite_ids\[i\] < imported_sprite_start\)\n\s*\{\n\s*imported_sprite_start = imported_sprite_ids\[i\];\n\s*\})/$1\n        if (imported_sprite_ids[i] > highest_known_import_spr_id)\n        {\n            highest_known_import_spr_id = imported_sprite_ids[i];\n        }/s' "$gml_file"
+                perl -0pi -e 's/(\n\s*if \(imported_sprite_ids\[i\] < imported_sprite_start\)\n\s*\{\n\s*imported_sprite_start = imported_sprite_ids\[i\];\n\s*\})/$1\n        if (imported_sprite_ids[i] > highest_known_import_spr_id)\n        {\n            highest_known_import_spr_id = imported_sprite_ids[i];\n        }/' "$gml_file"
             fi
-            perl -0pi -e 's/set_globals\(globals, true\);/set_globals(globals, true, true, false);/g' "$gml_file"
-            if rg -q "set_globals\\(globals, true\\);" "$gml_file" ||
-                ! rg -q "set_globals\\(globals, true, true, false\\);" "$gml_file" ||
-                ! rg -q "sprite_delete\\(old_imported_sprite_id\\)" "$gml_file" ||
-                ! rg -q "highest_known_import_spr_id = imported_sprite_ids\\[0\\]" "$gml_file"; then
-                echo "Failed to patch final globals restore in $data_win" >&2
+
+            perl -0pi -e 's/ds_exists\(i, 2\)(\s*\)\s*\{\s*ds_list_destroy\(lists_to_destroy\[i\]\);)/ds_exists(lists_to_destroy[i], 2)$1/sg' "$gml_file"
+            perl -0pi -e 's/ds_exists\(i, 1\)(\s*\)\s*\{\s*ds_map_destroy\(maps_to_destroy\[i\]\);)/ds_exists(maps_to_destroy[i], 1)$1/sg' "$gml_file"
+            perl -0pi -e 's/ds_exists\(i, 6\)(\s*\)\s*\{\s*ds_priority_destroy\(pqueues_to_destroy\[i\]\);)/ds_exists(pqueues_to_destroy[i], 6)$1/sg' "$gml_file"
+
+            if ! rg -U -q "set_globals\\(globals, true\\);\\s*\\nrefresh_ds_max_ids\\(\\);" "$gml_file"; then
+                perl -0pi -e 's/set_globals\(globals, true\);/set_globals(globals, true);\nrefresh_ds_max_ids();/' "$gml_file"
+            fi
+            if ! rg -U -q "ds_priority_destroy\\(pqueues_to_destroy\\[i\\]\\);[\\s\\S]{0,160}refresh_ds_max_ids\\(\\);\\s*\\nfor \\(i = 0; i < array_length\\(audio_ids\\); i\\+\\+\\)" "$gml_file"; then
+                perl -0pi -e 's/(\nfor \(i = 0; i < array_length\(audio_ids\); i\+\+\)\n\{\n\s*var audio_id = audio_ids\[i\];\n\s*audio_info = variable_struct_get\(audio, audio_id\);\n)(?![\s\S]*\nfor \(i = 0; i < array_length\(audio_ids\); i\+\+\)\n\{\n\s*var audio_id = audio_ids\[i\];\n\s*audio_info = variable_struct_get\(audio, audio_id\);\n)/\nrefresh_ds_max_ids();$1/' "$gml_file"
+            fi
+
+            if ! rg -q "sprite_delete\\(old_imported_sprite_id\\)" "$gml_file" ||
+                ! rg -q "highest_known_import_spr_id = imported_sprite_ids\\[0\\]" "$gml_file" ||
+                ! rg -q "imported_sprite_ids\\[i\\] > highest_known_import_spr_id" "$gml_file" ||
+                ! rg -q "ds_exists\\(lists_to_destroy\\[i\\], 2\\)" "$gml_file" ||
+                ! rg -q "ds_exists\\(maps_to_destroy\\[i\\], 1\\)" "$gml_file" ||
+                ! rg -q "ds_exists\\(pqueues_to_destroy\\[i\\], 6\\)" "$gml_file" ||
+                ! rg -U -q "set_globals\\(globals, true\\);\\s*\\nrefresh_ds_max_ids\\(\\);" "$gml_file" ||
+                ! rg -U -q "ds_priority_destroy\\(pqueues_to_destroy\\[i\\]\\);[\\s\\S]{0,160}refresh_ds_max_ids\\(\\);\\s*\\nfor \\(i = 0; i < array_length\\(audio_ids\\); i\\+\\+\\)" "$gml_file"; then
+                echo "Failed to patch savestate v2 load event in $data_win" >&2
                 exit 1
             fi
             ;;
+
         *)
             echo "Unknown code name: $code_name" >&2
             exit 1
@@ -157,9 +167,9 @@ fi
 for data_win in "${targets[@]}"; do
     echo "Patching $data_win"
     patch_code "$data_win" gml_Object_obj_savestate_manager_Create_0
+    patch_code "$data_win" gml_Object_obj_savestate_manager_Alarm_0
     patch_code "$data_win" gml_Object_obj_savestate_manager_Step_1
     patch_code "$data_win" gml_Object_obj_savestate_manager_Alarm_1
-    patch_code "$data_win" gml_Object_obj_savestate_manager_Alarm_0
 done
 
-echo "Applied savestate performance hotfix to ${#targets[@]} file(s)"
+echo "Applied savestate v2 performance hotfix to ${#targets[@]} file(s)"

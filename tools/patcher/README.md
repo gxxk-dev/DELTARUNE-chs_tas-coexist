@@ -26,7 +26,7 @@ dr-tas-chs restore                    # 从最近一次备份回滚
 # 均可加 --game-dir <路径>;未给则读 DELTARUNE_GAME_DIR,再自动探测 Steam 库
 ```
 
-安装做的事:对 `data.win` 与各章 `chapterN_windows/data.win` 应用内嵌 xdelta;各章的结果同时写成 `data_keucher.win`(Keucher 章节选择会读它);铺放 CHS 的 `lang/`、`vid/`。安装前把将被覆盖的原文件备份到 `<游戏目录>/_dr_tas_chs_backup/<时间戳>/`。
+安装做的事:对 `data.win` 与各章 `chapterN_windows/data.win` 应用内嵌 xdelta;各章的结果同时写成 `data_keucher.win`(Keucher 章节选择会读它);铺放 CHS 的 `lang/`、`vid/`、`mus/`。安装前把将被覆盖的原文件备份到 `<游戏目录>/_dr_tas_chs_backup/<时间戳>/`，并记录安装中新建的文件，使还原时也能完整移除它们。
 
 ### 安全保证
 
@@ -50,7 +50,7 @@ cargo build --release --manifest-path tools/patcher/Cargo.toml
 # 产物:tools/patcher/target/release/dr-tas-chs(≈ 78 MB,自包含)
 ```
 
-`gen_assets.sh` 会:用 `xdelta3 -e -9 -S djw` 生成 6 个差分(源窗口 `-B` 调到大于最大源文件),即时用 `xdelta3 -d` 回滚自校验;复制 `output/*/lang`、`*/vid`;复制中文字体;写 `assets/manifest.json`(含每个目标的源/结果 SHA256)。
+`gen_assets.sh` 会:用 `xdelta3 -e -9 -S djw` 生成 6 个差分(源窗口 `-B` 调到大于最大源文件),即时用 `xdelta3 -d` 回滚自校验;复制 `output/*/lang`、`*/vid`、Ch5 intro 音频;复制中文字体;写 `assets/manifest.json`(含每个目标的源/结果 SHA256)。
 
 ## 跨平台发布
 

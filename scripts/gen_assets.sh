@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 从 vanilla DELTARUNE + 合并结果 output/ 生成 patcher 内嵌资源:
 #   - 6 个 xdelta 差分(main + chapter1-5 的 data.win,vanilla -> merged)
-#   - 各章 CHS lang/ JSON 与 ch3/ch5 的 vid/ mp4
+#   - 各章 CHS lang/ JSON、ch3/ch5 vid/ mp4 与 Ch5 intro 音频
 #   - manifest.json(记录每个目标的相对路径、vanilla 源 sha256、结果 sha256)
 #
 # 这些产物是第三方(Keucher Mod + DeltaruneChinese/CHS)派生内容,默认被 .gitignore
@@ -136,7 +136,8 @@ cat > "$assets/manifest.json" <<EOF
 {
   "schema": 1,
   "description": "DELTARUNE Keucher Mod + CHS coexist patch set. Third-party derived content; apply only to a matching clean vanilla install.",
-  "keucher_mod_version": "v5.10.5",
+  "keucher_mod_version": "v5.10.7",
+  "keucher_mod_commit": "f3437becd845f34ce9cabe2709fb36e7e549a8be",
   "deltarune_chinese_commit": "824524b6c86b4b902ba13ee6c5483f3cfeef3cec",
   "targets": [
 $target_json

@@ -25,8 +25,7 @@ pub fn get_static(name: &str) -> Option<&'static [u8]> {
 
 fn zstd_decode(data: &[u8]) -> Vec<u8> {
     use std::io::Read;
-    let mut dec =
-        ruzstd::StreamingDecoder::new(data).expect("内嵌资源不是合法的 zstd 帧");
+    let mut dec = ruzstd::StreamingDecoder::new(data).expect("内嵌资源不是合法的 zstd 帧");
     let mut out = Vec::new();
     dec.read_to_end(&mut out).expect("解压内嵌资源失败");
     out
