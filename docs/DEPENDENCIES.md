@@ -1,91 +1,139 @@
-# Dependencies
+# 系统依赖
 
-这个仓库不发布 DELTARUNE、Keucher/TAS Mod、CHS patch 或任何生成后的 `data.win`。复现者需要自己准备正版游戏和第三方 Mod/patch 文件。
+当前构建器支持 Ubuntu 24.04+ 与 Arch Linux 主机。它处理的是 DELTARUNE PC
+`v0.0.247` 的 Windows 数据目录，也适用于 Linux/Proton 安装，但构建流程本身需要 Linux、
+Bash、.NET SDK 10 和 Wine。
 
-## Required local assets
+所有需要用户配置的工具都能直接通过 `apt` 或 `paru` 安装。除本仓库及其 submodule 外，
+唯一需要用户自行提供的非软件包输入是一份正版、干净的 DELTARUNE 游戏目录。当前主
+流程不需要 Node.js、Rust、Python、额外补丁器、Xvfb 或系统 `flips`。
 
-### DELTARUNE full game
+## Ubuntu 24.04+
 
-需要正版 DELTARUNE 安装目录，至少包含：
-
-- `data.win`
-- `chapter1_windows/data.win`
-- `chapter2_windows/data.win`
-- `chapter3_windows/data.win`
-- `chapter4_windows/data.win`
-- `chapter5_windows/data.win`
-
-默认脚本使用环境变量：
+.NET 10 可从 Ubuntu .NET Backports PPA 安装；已经配置 Microsoft APT 软件源的用户也可
+直接安装同名软件包。不要使用 `dotnet-install.sh`，本项目只要求包管理器维护的 SDK。
 
 ```bash
-export DELTARUNE_GAME_DIR="/path/to/DELTARUNE"
+sudo apt update
+sudo apt install -y software-properties-common
+sudo add-apt-repository -y universe
+sudo add-apt-repository -y ppa:dotnet/backports
+sudo apt update
+sudo apt install -y \
+  bash ca-certificates coreutils curl diffutils dotnet-sdk-10.0 ffmpeg \
+  findutils gawk git grep jq libchromaprint-tools patch perl ripgrep sed tar \
+  unzip util-linux wine
 ```
 
-### Keucher/TAS Mod
+如果系统已经配置 Microsoft APT 软件源，可跳过添加 PPA 的步骤，直接执行最后一条
+`apt install`。
 
-本研究使用 Keucher Mod `v5.10.7` 的 PC patches。官方 Release ZIP（2026-07-09 上传）的 SHA256 为 `1c4499a11cb93c2b8e3d60d4fa0d1bcd15467e5f48581df2333cab0bf8b8fb2b`：
+## Arch Linux
 
-| File | SHA256 |
-| --- | --- |
-| `patch_files/ch5_latest-chapter_select.bps` | `77fb87c615264138b595752ceadcb652e2b2a3860fb7ae7b11871feec0225a21` |
-| `patch_files/ch5_latest-chapter1.bps` | `014c730c165c75f97abfb99c72a35c5770f67c99dae8b1b0a8cfc5b560103ff5` |
-| `patch_files/ch5_latest-chapter2.bps` | `ea84926aa491acf77bde18ba8f550de3c570f405e4aa85e4c27e408371f5b7c9` |
-| `patch_files/ch5_latest-chapter3.bps` | `249e5af31336ccb550905e6850696bab25caac49e208f63779b8a86ba98e5986` |
-| `patch_files/ch5_latest-chapter4.bps` | `6806801a189e0d6486cef614ea85af15a12d8a4bee007c7ef5d76fbfb732db9a` |
-| `patch_files/ch5_latest-chapter5.bps` | `48071d643504e9fd21989719e689dcda3744de0fd7db009cf79c64566960fcbe` |
-
-默认脚本使用环境变量：
+Wine 位于 Arch 的 `multilib` 仓库。启用该仓库后执行：
 
 ```bash
-export KEUCHER_MOD_DIR="/path/to/Keucher.Mod.v5.10.7"
+paru -S --needed \
+  bash ca-certificates chromaprint coreutils curl diffutils dotnet-sdk ffmpeg findutils \
+  gawk git grep jq patch perl ripgrep sed tar unzip util-linux wine
 ```
 
-### DeltaruneChinese source
+Arch 是滚动发行版；安装后 `dotnet --version` 的主版本必须为 `10` 或更高。
 
-本研究使用：
-
-- Repository: `https://github.com/gm3dr/DeltaruneChinese.git`
-- Commit: `824524b6c86b4b902ba13ee6c5483f3cfeef3cec`
-
-默认脚本使用环境变量：
+## 环境检查
 
 ```bash
-export DELTARUNE_CHINESE_DIR="/path/to/DeltaruneChinese"
+dotnet --version
+wine --version
+ffmpeg -version | head -n1
+fpcalc -version
+jq --version
+git --version
 ```
 
-### CHS release data
+`build.sh` 会在读取游戏内容前检查所需命令，并拒绝低于 .NET 10 的 SDK。
 
-本研究使用的 CHS release package 包含外置 `lang/`、`vid/` 和 `.xdelta` files。已记录的 `.xdelta` SHA256：
+## 获取源码
 
-| File | SHA256 |
-| --- | --- |
-| `main.xdelta` | `2e9d26760203b92cb67fa99d6e28300d02664976e29a9e45fca098e8ef9b9461` |
-| `chapter1.xdelta` | `2e1083219227b371938012a36c776a5790ced8fa403b45b02094eb9c7c1396a9` |
-| `chapter2.xdelta` | `a98580c4febbcae62d4fac457fa53178a37c01145dc37aa0efe58ede0bd2b392` |
-| `chapter3.xdelta` | `620c3239156a38f9559b0fc5c86ffccb25be192a43352e33b57f27ee0e17ef01` |
-| `chapter4.xdelta` | `4563d9b6765fbc790e2367765b3b4dca7b3da2da2c1e27cecd6929f2684529bf` |
-| `chapter5.xdelta` | `15627d6912ac2226dab8ff7fac14c3442013f5abbb504262ec955b6203ca92d4` |
-
-默认脚本使用环境变量：
+必须使用 Git clone，以便版本锁校验 submodule gitlink、路径和 URL。推荐一次取得所有固定
+上游：
 
 ```bash
-export CHS_RELEASE_DIR="/path/to/dr-ch-patch-260704-including-ch5"
+git clone --recurse-submodules \
+  https://github.com/gxxk-dev/DELTARUNE-chs_tas-coexist.git
+cd DELTARUNE-chs_tas-coexist
+git submodule status
 ```
 
-### RomPatcher.js
-
-`scripts/apply_bps.js` 需要 RomPatcher.js 的 CommonJS modules：
+已有主仓库 checkout 可执行：
 
 ```bash
-export ROMPATCHER_JS="/path/to/RomPatcher.js/rom-patcher-js"
+git submodule update --init --recursive
 ```
 
-## Local-only outputs
+在线构建会尝试初始化缺失 submodule，并确保机器锁 commit object 可用。离线模式不运行
+任何 clone/fetch，因此三个 submodule Git 仓库必须已经存在，并各自包含锁定 commit；
+工作树 `HEAD` 可以不同，构建器直接从锁定 object 导出源码。GitHub Source ZIP 不包含
+gitlink 元数据，不是受支持的交付形式。
 
-以下路径是本地生成/安装用，不应提交到 GitHub：
+当前三个 submodule 为：
 
-- `build/`
-- `output/`
-- `backups/`
-- `work/`
-- `latest_backup.txt`
+- `upstream/keucher-mod`：Keucher Mod 源码；
+- `upstream/UMP`：Keucher 构建使用的固定 `ump.csx`；
+- `upstream/DeltaruneChinese`：`260710` 汉化源码、工作区和上游媒体。
+
+## 自动管理的工具
+
+以下工具或内容由版本锁管理，用户不需要手工下载或加入 `PATH`：
+
+- UndertaleModTool CLI `0.9.1.1` 的 Ubuntu/Linux 归档，用于从 Keucher 源码生成六份
+  `data.win`；
+- Flips v198 Linux 归档，仅在指定 `--patchset-dir` 时用于创建并回放验证 BPS；
+- DeltaruneChinese submodule 中固定的 BMFont Windows 工具，由系统 Wine 执行；
+- `adapters/deltarune-chinese-260710.packages.lock.json` 固定的 NuGet 依赖。
+
+下载归档、归档内关键成员和源码 commit 都会在使用前校验。工具下载损坏时在线模式会
+重新获取，离线模式则直接失败。
+
+## 游戏输入
+
+输入目录必须包含机器锁对应的以下文件：
+
+```text
+data.win
+chapter1_windows/data.win
+chapter2_windows/data.win
+chapter3_windows/data.win
+chapter4_windows/data.win
+chapter5_windows/data.win
+chapter5_windows/vid/ch5_intro_jp.mp4
+```
+
+脚本要求这些文件精确匹配 DELTARUNE PC `v0.0.247`。已经安装汉化、Keucher 或其他 Mod
+的目录会在 submodule 初始化和工具下载前被拒绝；请另备一份干净游戏本体。构建不会向
+该目录写入文件，安装必须随后显式执行 `install_output.sh apply`。
+
+## 网络、缓存与磁盘
+
+首次 clone 会从 GitHub 获取三个固定 submodule，其中 DeltaruneChinese 包含构建所需
+媒体，体积明显大于另外两个。首次在线构建还会访问 GitHub Releases 获取固定 UTMT CLI、
+访问 NuGet 获取锁定包；只有请求本地补丁集时才会额外获取 Flips。
+
+默认缓存位于 `${XDG_CACHE_HOME:-$HOME/.cache}/dr-tas-chs`，包含下载、NuGet 包和 Wine
+prefix。下载使用可续传的 `.part` 文件，并在命中缓存时重新校验大小和 SHA256。
+
+要使用 `--offline`，必须同时满足：
+
+- 三个 submodule 已初始化，且各自的 Git object database 已包含版本锁 commit；
+- UTMT CLI 归档和所有 NuGet 包已在指定缓存中；
+- 若同时使用 `--patchset-dir`，Flips 归档也已由此前的在线补丁集构建缓存。
+
+离线 NuGet restore 会清空远程 package source；缺失、损坏或版本不符时不会静默联网或
+回退到其他版本。
+
+临时工作目录至少需要 4 GiB 可用空间。默认值为 `${TMPDIR:-/tmp}`；自定义
+`--work-dir` 只能包含 ASCII 字母、数字、`_`、`.`、`/` 和 `-`。游戏、输出、补丁集、
+缓存和工作目录参数本身不能是符号链接。输出与补丁集必须和游戏
+目录完全不相交，也不能彼此重叠；缓存和工作目录不能位于游戏目录内部，但允许作为游戏
+fixture 的祖先（例如 `/tmp`）。缓存/工作目录也不能与输出或补丁集重叠。任何写入路径若
+位于本仓库内，都必须已被 `.gitignore` 覆盖；推荐使用 `output/`、`patchset/`、`work/`。

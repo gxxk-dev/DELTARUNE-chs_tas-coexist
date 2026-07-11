@@ -4,6 +4,11 @@
 /backups/
 /work/
 /latest_backup.txt
+/latest_*_backup.txt
+/.dr-tas-chs-*.lock
+/.dr-tas-chs-output.*/
+/.dr-tas-chs-publish.*/
+/.dr-tas-chs-patchset-build.*/
 
 # Generated verification dumps. Keep compact .tsv reports and code lists tracked.
 /verify/**/*.gml
@@ -15,12 +20,16 @@
 # Rust build output.
 /tools/patcher/target/
 
-# Generated, third-party-derived embedded patcher assets.
-# These are distributed only via release binaries, never committed to this repo.
+# Generated, third-party-derived embedded patcher assets. Keep them local only.
 /tools/patcher/assets/
 
-# Built release binaries and packaged patch sets (distributed via releases only).
+# Local build artifacts and patch sets; do not commit or redistribute them.
 /dist/
+/patchset/
+/patchsets/
+
+# UndertaleModTool/ImportGraphics may emit this when run from a local checkout.
+/Packager/
 
 # Logs and local machine files.
 *.log
@@ -34,7 +43,15 @@ Thumbs.db
 *.bps
 *.xdelta
 *.mp4
+*.ogg
+*.wav
 *.exe
 *.dll
 *.ttf
 *.otf
+*.zip
+*.tar.gz
+*.7z
+*.rar
+*.png
+*.jpg

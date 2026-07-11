@@ -1,0 +1,188 @@
+diff --git a/src/Program.cs b/src/Program.cs
+--- a/src/Program.cs
++++ b/src/Program.cs
+@@ -25,15 +25,7 @@
+                 new Importer(Path.Combine(workspace, "ch1"), Path.Combine(workspace, "result/ch1"), Path.Combine(workspace, "ch1/data.win")).Run(),
+                 new Importer(Path.Combine(workspace, "main"), Path.Combine(workspace, "result/main"), Path.Combine(workspace, "main/data.win")).RunMain()
+             );
+-            await Task.WhenAll(
+-                new Importer(Path.Combine(workspace, "demo"), Path.Combine(workspace, "result/demo"), Path.Combine(workspace, "demo/data.win")).RunDemo()
+-            );
+-
+-            // 复制文本到demo
+-            foreach (var f in Directory.GetFiles(Path.Combine(res, "ch1"), "lang_*.json"))
+-                File.Copy(f, Path.Combine(res, "demo", Path.GetFileNameWithoutExtension(f) + "_ch1.json"), true);
+-            foreach (var f in Directory.GetFiles(Path.Combine(res, "ch2"), "lang_*.json"))
+-                File.Copy(f, Path.Combine(res, "demo", Path.GetFileName(f)), true);
++            // Demo is not part of the full-game TAS+CHS merge.
+             Console.WriteLine($"build time: {DateTime.Now - begin}");
+         }
+     }
+diff --git a/src/Importer.cs b/src/Importer.cs
+--- a/src/Importer.cs
++++ b/src/Importer.cs
+@@ -71,7 +71,8 @@
+         public async Task ImportSprites(UndertaleData datawin)
+         {
+             Range[] segment = new Range[9];
+-            foreach (var file in new DirectoryInfo(Path.Combine(workspace, "imports/atlas")).GetFiles("*.cfg"))
++            foreach (var file in new DirectoryInfo(Path.Combine(workspace, "imports/atlas")).GetFiles("*.cfg")
++                .OrderBy(file => file.Name, StringComparer.Ordinal))
+             {
+                 Task<byte[]> png = File.ReadAllBytesAsync(Path.ChangeExtension(file.FullName, ".png"));
+                 Task<string[]> lines = File.ReadAllLinesAsync(file.FullName, Encoding.UTF8);
+@@ -305,7 +306,8 @@
+             string pngPath = Path.Combine(dumpPath, $"{font_name}_0.png");
+             // 检查后置 出错了直接把任务崩掉就行
+             // 这里可能还有救 说不定等一会还能刷出来
+-            while (!File.Exists(outputPath) || !File.Exists(pngPath)) Info($"[ImportFonts]{font_name} bmfont output not found!");
++            if (!File.Exists(outputPath) || !File.Exists(pngPath))
++                Assert($"[ImportFonts]{font_name} bmfont output not found");
+             var readFnt = File.ReadAllTextAsync(outputPath, Encoding.UTF8).ContinueWith(fnt =>
+             {
+                 Int16 xoffset = Int16.Parse(XOffset().Match(bmfc).Groups[1].Value);
+@@ -387,21 +389,24 @@
+             // dic.txt需要是UTF-16的
+             Task writeDict = Task.WhenAll(dictContents).ContinueWith(task =>
+             {
+-                char[] set = [.. task.Result.SelectMany(x => x).Distinct()];
++                char[] set = [.. task.Result.SelectMany(x => x).Distinct().Order()];
+                 File.WriteAllBytes(dictPath, Encoding.Unicode.GetBytes(set));
+             });
+             Task copyFiles = Task.Run(() =>
+             {
+-                foreach (var config in new DirectoryInfo(Path.Combine(workspace, "imports/font/font")).GetFiles())
++                foreach (var config in new DirectoryInfo(Path.Combine(workspace, "imports/font/font")).GetFiles()
++                    .OrderBy(file => file.Name, StringComparer.Ordinal))
+                 {
+                     File.Copy(config.ToString(), Path.Combine(dumpPath, config.Name));
+                 }
+             });
+-            await Task.WhenAll(new DirectoryInfo(Path.Combine(workspace, "imports/font/bmfc")).GetFiles().Select(async config =>
++            foreach (var config in new DirectoryInfo(Path.Combine(workspace, "imports/font/bmfc")).GetFiles()
++                .OrderBy(file => file.Name, StringComparer.Ordinal))
+             {
+                 Task<string> bmfc = File.ReadAllTextAsync(config.FullName, Encoding.UTF8);
+                 string font_name = Path.GetFileNameWithoutExtension(config.Name);
+                 IEnumerable<string> segments = new DirectoryInfo(Path.Combine(workspace, "imports/font/pics", font_name)).GetFiles()
++                    .OrderBy(file => file.Name, StringComparer.Ordinal)
+                     .Select(img =>
+                     {
+                         Span<Range> tokens = stackalloc Range[3];
+@@ -418,7 +423,7 @@
+                 {
+                     StartInfo = new ProcessStartInfo()
+                     {
+-                        FileName = "tool/bmfont64.exe",
++                        FileName = OperatingSystem.IsWindows() ? "tool/bmfont64.exe" : "wine",
+                         CreateNoWindow = true,
+                         RedirectStandardOutput = true,
+                         ArgumentList = {
+@@ -428,6 +433,11 @@
+                         }
+                     }
+                 };
++                if (!OperatingSystem.IsWindows())
++                {
++                    bmfont.StartInfo.ArgumentList.Insert(0, "tool/bmfont64.exe");
++                    bmfont.StartInfo.Environment["WINEDEBUG"] = "-all";
++                }
+                 // 这里是关键路径 一点都不能耽搁
+                 await writeDict;
+                 await copyFiles;
+@@ -435,10 +445,12 @@
+                 bmfont.Start();
+                 Info($"[ImportFonts]{font_name} started!");
+                 await bmfont!.WaitForExitAsync();
++                if (bmfont.ExitCode != 0)
++                    Assert($"[ImportFonts]{font_name} bmfont exited with code {bmfont.ExitCode}");
+                 Info($"[ImportFonts]{font_name} finished!");
+                 await ImportFontData(datawinTask, font_name, outputPath, bmfc.Result);
+                 Info($"[ImportFonts]{font_name} imported!");
+-            }));
++            }
+         }
+         #endregion
+         #region ImportCodes
+@@ -449,8 +461,7 @@
+             {
+                 if (datawin.Code.ByName(fileName) == null)
+                 {
+-                    Warning($"[ImportCodes]code not exist within data.win: {fileName}");
+-                    continue;
++                    Assert($"[ImportCodes]code not exist within data.win: {fileName}");
+                 }
+                 importGroup.QueueReplace(fileName, await content);
+             }
+@@ -459,7 +470,7 @@
+             CompileResult result = importGroup.Import();
+             if (!result.Successful)
+             {
+-                Warning($"[ImportCodes]compile failed: {result.PrintAllErrors(true)}");
++                Assert($"[ImportCodes]compile failed: {result.PrintAllErrors(true)}");
+             }
+             if (datawin.Variables.Any(x => x.Name.Content.Contains("zhname")))
+             {
+@@ -470,6 +481,7 @@
+         public async Task Run()
+         {
+             IEnumerable<(string fileName, Task<string> content)> taskBag = [.. new DirectoryInfo(Path.Combine(workspace, "imports/code")).GetFiles()
++                .OrderBy(file => file.Name, StringComparer.Ordinal)
+                 .Select(file => (Path.GetFileNameWithoutExtension(file.Name), File.ReadAllTextAsync(file.FullName, Encoding.UTF8))
+             ).ToArray()];
+             Task<string> re_cnname = File.ReadAllTextAsync(Path.Combine(workspace, "../global/re_cnname.json"), Encoding.UTF8);
+@@ -484,8 +496,9 @@
+             Task importTexts = ImportTexts(await cn, await en, await fmt, await re_cnname, await re_recruit);
+ 
+             // using UndertaleData datawin = await datawinTask;// 如果对CPU很有信心的可以把上面那行await挪到这里
+-            Task importCodes = ImportCodes(datawin, taskBag, ImportSprites(datawin));
+-            await Task.WhenAll(importFonts, importCodes);
++            await importFonts;
++            await ImportSprites(datawin);
++            await ImportCodes(datawin, taskBag, Task.CompletedTask);
+ 
+             using FileStream output = new(Path.Combine(ResultPath, "data.win"), FileMode.Create, FileAccess.Write);
+ 
+@@ -500,6 +513,7 @@
+         public async Task RunMain()
+         {
+             IEnumerable<(string fileName, Task<string> content)> taskBag = [.. new DirectoryInfo(Path.Combine(workspace, "imports/code")).GetFiles()
++                .OrderBy(file => file.Name, StringComparer.Ordinal)
+                 .Select(file => (Path.GetFileNameWithoutExtension(file.Name), File.ReadAllTextAsync(file.FullName, Encoding.UTF8))
+             ).ToArray()];
+             Task<UndertaleData> datawinTask = Task.Run(LoadData);
+@@ -509,8 +523,8 @@
+             UndertaleData datawin = await datawinTask;
+ 
+             // code 本身还是照常导入
+-            Task importCodes = ImportCodes(datawin, taskBag, Task.CompletedTask);
+-            await Task.WhenAll(importFonts, importCodes);
++            await importFonts;
++            await ImportCodes(datawin, taskBag, Task.CompletedTask);
+ 
+             using FileStream output = new(Path.Combine(ResultPath, "data.win"), FileMode.Create, FileAccess.Write);
+ 
+@@ -548,4 +562,4 @@
+         }
+ 
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/src/deltarunePacker.csproj b/src/deltarunePacker.csproj
+--- a/src/deltarunePacker.csproj
++++ b/src/deltarunePacker.csproj
+@@ -5,10 +5,11 @@
+     <TargetFrameworks>net10.0</TargetFrameworks>
+     <ImplicitUsings>enable</ImplicitUsings>
+     <Nullable>enable</Nullable>
+-    <PublishAot>True</PublishAot>
++    <PublishAot>False</PublishAot>
+     <InvariantGlobalization>true</InvariantGlobalization>
+     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+-    <PublishTrimmed>True</PublishTrimmed>
++    <PublishTrimmed>False</PublishTrimmed>
++    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+   </PropertyGroup>
+ 
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

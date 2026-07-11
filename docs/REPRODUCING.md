@@ -1,86 +1,188 @@
-# Reproducing the Research Build
+# 可复现构建说明
 
-这份说明记录 Keucher Mod `v5.10.7`、DeltaruneChinese `824524b` 与 DELTARUNE Chapter 5 `v0.0.247` 的共存构建路线。仓库不包含游戏资产、第三方补丁或最终 `data.win`。
+当前构建 ID 为 `pc-v0.0.247-f3437be-260710`。schema 2 机器锁
+[`versions/pc-v0.0.247-f3437be-260710.json`](../versions/pc-v0.0.247-f3437be-260710.json)
+是版本、大小、SHA256、来源路径和输出集合的唯一事实源。
 
-## High-level process
+## 锁定来源
 
-1. 从正版 DELTARUNE `v0.0.247` 读取原始 `data.win` files。
-2. 应用 Keucher Mod `v5.10.7` PC `.bps`，生成 main 与 Chapter 1-5 baseline。
-3. 把 baseline 放入 DeltaruneChinese workspace，并运行 `scripts/apply_keucher_savestate_hotfix.sh`：移除会把 Savestates v2.1 降回 v1 的旧 manager import，同时保留 initializer、town event 与 readable-room hooks。
-4. 运行 `scripts/apply_ch5_v0247_compat.sh`，把 DELTARUNE Ch5 `v0.0.247` 的 4 组更新合入 CHS imports。
-5. 用 DeltaruneChinese packer 导入中文代码、字体、贴图和文本。
-6. 对 packer result 运行 `scripts/reinstrument_keucher_savestate_v2.sh`，恢复被 CHS `QueueReplace` 覆盖的 logged calls 与 loading guards。
-7. 依次运行 Savestates v2.1 performance、Ch5 pause 和 Ch5 rhythm font hotfix。
-8. 将每章最终 `data.win` 同时安装为 `data_keucher.win`。
+| 组件 | 仓库路径或交付形式 | 锁定版本 |
+| --- | --- | --- |
+| Keucher Mod | `upstream/keucher-mod` submodule | `f3437becd845f34ce9cabe2709fb36e7e549a8be` |
+| UMP | `upstream/UMP` submodule | `c08b817ad2e8ba1e7da481e468c1881f9ded7ad5` |
+| DeltaruneChinese | `upstream/DeltaruneChinese` submodule | tag `260710` / `2d322c11d7b086e018bc8a9b823d18c80685d7f6` |
+| UndertaleModTool CLI | 经校验的 GitHub Release 归档 | `0.9.1.1` |
+| Flips | 仅补丁集流程下载的 Linux 归档 | `v198` |
 
-## Savestates v2.1
+submodule commit 才是源码身份；tag 和短版本号只用于阅读。`check_version_lock.sh` 同时
+校验 gitlink、`.gitmodules` 中的路径/URL、适配器大小与哈希及 NuGet lock 结构。
 
-`v5.10.7` 把 savestate 实现从 `src/mod/common/_savestates` 移到独立的 `src/savestate`，并由 `BuildSavestate()` 显式注入。旧版 `gml_Object_obj_savestate_manager_Create_0.gml` import 不能继续使用，否则 CHS packer 会把整个 v2 manager 覆盖回 v1。
-
-新版 constructor 以名称保存并通过 `asset_get_index(arg0.const_func)` 恢复，不再应用旧的 `method(undefined, const_func)` 补丁。仍需保留：
-
-- `obj_readable_room1` Step 的 loading guard 与 `myinteract` fallback。
-- CHS imports 中 Create/BeginStep/RoomStart/PreCreate 的 loading guard。
-- CHS imports 中 audio/DS/sprite/path/JSON/call_later 的 logged wrappers。
-- Ch5 boss room 的 persistent manager 与安全存在性检查。
-
-`scripts/apply_savestate_performance_hotfix.sh` 已按 v2 事件职责重写：Create 维护音频/DS/sprite 基线，Alarm 0 修 call_later，Step Begin 保存，Alarm 1 读取与清理。
-
-## Chapter 5 v0.0.247
-
-官方 `v5.10.7` Release 资产在 2026-07-09 重新生成，目标 Ch5 已是 `v0.0.247`。DeltaruneChinese `824524b` 的部分 imports 仍基于较早版本，因此 `scripts/apply_ch5_v0247_compat.sh` 合并：
-
-- 更新 credits（Concept Art、Platforming VFX、Musical Assistance）。
-- 悬崖场景的两处 `interjection = -1`（汉化源已包含，脚本验证）。
-- initializer 的 `global.versionno = "v0.0.247"`。
-- Terracota 三处 turn timer：`275`、`245`、`365`。
-
-## Commands
+## 准备 checkout
 
 ```bash
-# baseline 已由 v5.10.7 BPS 生成到 build/keucher-v5.10.7
-./scripts/apply_keucher_savestate_hotfix.sh \
-  work/DeltaruneChinese-keucher-v5.10.7/workspace \
-  build/keucher-v5.10.7
-./scripts/apply_ch5_v0247_compat.sh \
-  work/DeltaruneChinese-keucher-v5.10.7/workspace
-
-# 在 DeltaruneChinese worktree 根运行 packer
-dotnet build -c Release src
-dotnet src/bin/Release/net10.0/deltarunePacker.dll workspace
-
-./scripts/reinstrument_keucher_savestate_v2.sh \
-  work/DeltaruneChinese-keucher-v5.10.7/workspace
-./scripts/apply_savestate_performance_hotfix.sh output
-./scripts/apply_ch5_pause_savestate_hotfix.sh output/chapter5_windows/data.win
-./scripts/apply_ch5_rhythm_evaluation_font_hotfix.sh output/chapter5_windows/data.win
+git clone --recurse-submodules \
+  https://github.com/gxxk-dev/DELTARUNE-chs_tas-coexist.git
+cd DELTARUNE-chs_tas-coexist
+./scripts/check_version_lock.sh
 ```
 
-## Expected final output hashes
+构建必须在 Git checkout 中运行。GitHub Source ZIP 缺少 submodule gitlink，无法通过来源
+校验。已有 checkout 可先运行 `git submodule update --init --recursive`。
 
-| File | SHA256 |
-| --- | --- |
-| `output/data.win` | `548d07d75812ae04d218dd342cc06404a30c7fe57d70bbf2e7c54b71d036286f` |
-| `output/chapter1_windows/data.win` | `9869fc61101c3cdcd2aad998892fa94c4778827eec63f9a1128d8f01c5206629` |
-| `output/chapter2_windows/data.win` | `123372dba8e3a22820b3a14a25fb391cf8ac3b67ba10a79ecb5a708cad6fc0a8` |
-| `output/chapter3_windows/data.win` | `ad8cb83f6ea183577e5107fd02b31acf1ff2b566a6e413397a99d5850bc50b9e` |
-| `output/chapter4_windows/data.win` | `27682b6460e76c6759b7ac79f24e58eedcfe06c5dc96bb912e1658409b00c6a8` |
-| `output/chapter5_windows/data.win` | `476530adcf491ce592d65f9ecba80f500c8ac3994b2ddb494acbf05c2911c470` |
-
-## Verification
+## 统一构建流程
 
 ```bash
-./scripts/verify_local_assets.sh
-./scripts/check_code_conflicts.sh
-./scripts/verify_merged_output.sh output
+./build.sh --game-dir "/path/to/clean/DELTARUNE"
 ```
 
-新版报告保存在 `verify/code_conflicts_v5.10.7/*.tsv` 与 `verify/code_lists_v5.10.7/*.txt`。175 个 CHS import 目标没有 `merged_lost_keucher` 条目。
+流水线按以下顺序执行：
 
-## Installing local output
+1. 验证 schema 2 版本锁、三个 gitlink、`.gitmodules`、适配器和 NuGet lock，再校验干净
+   游戏的六个 `data.win` 与 Ch5 日文视频。游戏不匹配时不会开始下载。
+2. 确认 Keucher、UMP 与 DeltaruneChinese 的锁定 commit object 可用；离线模式要求三个
+   submodule Git 仓库已经存在且绝不运行 clone/fetch，在线模式才会初始化缺失仓库或获取
+   缺少的 object。
+3. 将 Keucher commit 导出到临时目录，从 UMP commit 取出并再次哈希固定 `ump.csx`，以
+   `--fuzz=0` 应用 Linux/确定性适配器。
+4. 下载并校验 UndertaleModTool CLI `0.9.1.1` 归档及关键成员，分别用 Keucher 的 chapter
+   select、Chapter 1-5 源码脚本处理六份原版 `data.win`；每个 Keucher baseline 必须匹配
+   机器锁中的 SHA256。
+5. 导出 DeltaruneChinese `260710` commit，以 `--fuzz=0` 应用共存适配器并安装仓库固定的
+   `packages.lock.json`，然后把六份 Keucher baseline 放入其 workspace。
+6. 移除会覆盖 Savestates v2.1 manager 的旧 import，给 initializer、readable-room 和 Ch5
+   town event 合入 loading guard / `mod_init()` 规则；同时验证 `260710` 已原生包含
+   DELTARUNE Ch5 `v0.0.247` credits、版本号、Terracota timer 与 cliff-scene 修复。
+7. 使用 `dotnet restore --locked-mode` 和 .NET 10 构建 CHS packer，再对 Keucher baseline
+   导入中文代码、字体、贴图、文本及上游媒体。
+8. 对 packer 结果重新注入 Keucher Savestates v2.1 wrappers/loading guards，随后应用
+   savestate performance、Ch5 pause 和 rhythm-evaluation font 热修。
+9. 组装语言 JSON、视频，并从固定 WAV 生成两份内容相同的 Ch5 Vorbis OGG。
+10. 校验所有固定哈希、音频属性、Chromaprint 内容指纹、关键反编译代码与输出文件集合，写入 schema 2
+    `build-info.json`；若指定 `--patchset-dir`，此时创建并回放验证本地补丁集。全部成功后
+    才原子替换目标 `output/`。
+
+任何构建失败都不会写入游戏目录。已存在的输出在新 staging tree 完整通过前保持不变；
+发布期间的普通中断会触发旧目录恢复。
+
+## 在线与离线复现
+
+先用固定缓存执行一次在线构建：
 
 ```bash
-./install_output.sh "$DELTARUNE_GAME_DIR"
+./build.sh \
+  --game-dir "/path/to/clean/DELTARUNE" \
+  --cache-dir "$HOME/.cache/dr-tas-chs"
 ```
 
-安装脚本会先在 `backups/` 创建带时间戳的本地备份。
+随后可在同一 checkout 上禁用下载和远程 NuGet source：
+
+```bash
+./build.sh \
+  --game-dir "/path/to/clean/DELTARUNE" \
+  --cache-dir "$HOME/.cache/dr-tas-chs" \
+  --output-dir /tmp/dr-tas-chs-output-offline \
+  --offline
+```
+
+离线模式要求三个 submodule Git 仓库已经初始化、各自 object database 已包含固定 commit、
+UTMT 归档完整且锁定 NuGet 包已经缓存。工作树 `HEAD` 可以处于其他 commit，构建器直接
+导出锁定 object；它不会 clone/fetch、回退到其他版本或接受损坏缓存。下载使用稳定
+`.part` 文件，在线重试可以续传。
+
+若离线构建还需要 `--patchset-dir`，应先至少在线执行一次带该参数的构建，使锁定 Flips
+归档进入同一缓存；普通在线构建不会为未请求的可选功能预下载 Flips。
+
+## 本地补丁集
+
+```bash
+./build.sh \
+  --game-dir "/path/to/clean/DELTARUNE" \
+  --output-dir ./output \
+  --patchset-dir ./patchset
+```
+
+构建器从版本锁下载并校验 Flips v198 Linux 归档，不依赖系统 `flips`。补丁集包含：
+
+- `patches/`：main 与 Chapter 1-5 的 vanilla-to-final BPS；
+- `extras/`：语言、视频和生成音频等无法放入 `data.win` 的文件；
+- `manifest.json`：完整来源、输入/输出/BPS 哈希、文件大小，以及五条
+  `derived_copies` 形式的 `data_keucher.win` 复制规则；
+- `README.txt`：独立回放顺序。
+
+每份 BPS 创建后都会立即应用到对应干净输入，并检查结果 SHA256。补丁集由游戏本体与
+第三方资产派生，只用于持有者本机归档或研究，不得加入 Git、Release 或其他分发物。
+
+## 输出验证边界
+
+跨环境固定输出包括六个最终 `data.win` 和 21 个静态外置文件，后者为语言 JSON 与视频；
+它们全部按机器锁校验字节数（适用时）与 SHA256。源 WAV 同样锁定 bytes/SHA256。两份
+构建生成的 Ch5 OGG 必须内容相同，并验证 Vorbis codec、48 kHz、双声道、时长和相对
+锁定源 WAV 至少 `0.99` 的 Chromaprint 位相似度。这样允许不同 libvorbis 产生不同容器，
+同时拒绝仅伪造技术属性的静音或无关音频。
+
+`scripts/verify_merged_output.sh` 会反编译关键代码，验证 Savestates v2.1、Flowery boss
+practice、initializer/readable-room guards、Ch5 pause 和 rhythm font 修复。输出树只允许
+版本锁声明的普通文件、必需父目录及 `build-info.json`，符号链接、特殊文件和额外空目录
+都会被拒绝。
+
+`build-info.json` 绑定构建 ID、上游/适配器/UTMT provenance、构建环境版本、六个固定
+输出哈希，以及本机 OGG 的 bytes/SHA256。安装器与补丁集只接受和这份声明一致的两份
+音频副本，并再次检查音频属性与内容指纹。构建时间、环境版本和 OGG 容器不承诺跨环境逐字节相同；
+不同 `apt` / `paru` FFmpeg/libvorbis 版本产生不同哈希是允许的。
+
+## 显式安装测试
+
+安装与构建分离。对隔离的游戏副本执行：
+
+```bash
+./install_output.sh apply --game-dir "/path/to/test/DELTARUNE"
+./install_output.sh apply --game-dir "/path/to/test/DELTARUNE"   # 幂等检查
+./install_output.sh restore --game-dir "/path/to/test/DELTARUNE"
+./install_output.sh restore --game-dir "/path/to/test/DELTARUNE" # 幂等检查
+```
+
+安装清单来自同一 schema 2 版本锁。六份最终 `data.win`、Chapter 1-5 的五份
+`data_keucher.win`、21 个静态外置文件和两份生成音频合计 34 个目标。备份 manifest 记录
+每个目标安装前状态、原哈希和安装哈希；备份还会绑定当前 build ID、完整目标集合和事务
+状态。安装后被其他程序修改的文件不会被还原流程覆盖。
+
+安装器处理普通错误、`Ctrl-C` 和 `TERM`，但 Bash 无法把断电、`SIGKILL` 或同一用户的
+恶意并发进程纳入完整事务边界。异常掉电后若游戏根目录残留
+`.dr-tas-chs-install.lock`，先确认没有安装器进程，再检查最新备份的 `status`。对
+`APPLYING` 备份可移除空锁目录并显式运行：
+
+```bash
+./install_output.sh restore \
+  --game-dir "/path/to/test/DELTARUNE" \
+  --backup "/path/to/that/backup"
+```
+
+不要在安装器仍运行时手工删除锁。
+
+## 维护者检查
+
+不含版权资产的静态检查可在任意完整 Git clone 或公共 CI 中运行：
+
+```bash
+bash -n build.sh install_output.sh
+find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+./scripts/check_version_lock.sh
+./scripts/check_publish_tree.sh
+git diff --check
+```
+
+完整构建和补丁集回放需要维护者提供合法游戏输入，因此公共 CI 只执行静态检查。
+
+## 关键兼容结论
+
+- 面向原版 `data.win` 的既有成品差分不能直接套到 Keucher 输出；当前路线从固定源码生成
+  Keucher baseline，再针对该 baseline 运行 DeltaruneChinese importer。
+- Keucher `f3437be` 使用独立 Savestates v2.1 注入；旧 manager import 会将其覆盖回 v1，
+  因此必须移除旧 import，并在 CHS code replacement 后重新插桩。
+- Chapter 1-5 initializer 必须保留 loading guard 与 `mod_init();`；readable-room Step 必须在
+  读档期间退出并为 `myinteract` 提供 fallback。
+- DeltaruneChinese `260710` 已包含 Ch5 `v0.0.247` credits/version/timer/cliff-scene 更新，
+  构建器将其作为锁定前提验证；最终结果还需让 savestate manager 常驻并安全处理 boss
+  room 的 Pause/`obj_time`。
+- Keucher chapter selector 加载 `data_keucher.win`；安装和补丁集 manifest 都必须让每章
+  该文件与最终 `data.win` 完全一致。

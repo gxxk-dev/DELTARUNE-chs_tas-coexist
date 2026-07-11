@@ -4,11 +4,12 @@
 #   - 各章 CHS lang/ JSON、ch3/ch5 vid/ mp4 与 Ch5 intro 音频
 #   - manifest.json(记录每个目标的相对路径、vanilla 源 sha256、结果 sha256)
 #
-# 这些产物是第三方(Keucher Mod + DeltaruneChinese/CHS)派生内容,默认被 .gitignore
-# 忽略,只随 Release 二进制分发,不提交进公开仓库。
+# 这是不受支持的本地研究遗留脚本。产物是第三方派生内容,默认被 .gitignore
+# 忽略,不得提交、发布或嵌入公开分发的二进制。
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+version_file="$root/versions/pc-v0.0.247-f3437be-260710.json"
 game="${DELTARUNE_GAME_DIR:?set DELTARUNE_GAME_DIR to a clean vanilla DELTARUNE install}"
 out="${OUTPUT_DIR:-$root/output}"
 assets="${ASSETS_DIR:-$root/tools/patcher/assets}"
@@ -18,6 +19,11 @@ srcwin="${XDELTA_SRCWIN:-268435456}"
 
 command -v xdelta3 >/dev/null || { echo "xdelta3 not found on PATH" >&2; exit 2; }
 command -v zstd >/dev/null || { echo "zstd not found on PATH" >&2; exit 2; }
+command -v jq >/dev/null || { echo "jq not found on PATH" >&2; exit 2; }
+
+keucher_version="$(jq -er '.upstreams.keucher.version' "$version_file")"
+keucher_commit="$(jq -er '.upstreams.keucher.source_commit' "$version_file")"
+deltarune_chinese_commit="$(jq -er '.upstreams.deltarune_chinese.commit' "$version_file")"
 
 sha() { sha256sum "$1" | awk '{print $1}'; }
 sz()  { wc -c < "$1" | tr -d ' '; }
@@ -36,8 +42,8 @@ rm -rf "$assets"
 mkdir -p "$assets/patches" "$assets/lang" "$assets/vid" "$assets/fonts"
 
 # GUI 用的中文字体(HarmonyOS Sans SC)。子集化到 GB2312 + 源码用字,~8M -> ~2M。可用 UI_FONT 覆盖来源。
-ui_font="${UI_FONT:-/home/frez79/下载/HarmonyOS-Sans/HarmonyOS Sans/HarmonyOS_Sans_SC/HarmonyOS_Sans_SC_Regular.ttf}"
-if [ -f "$ui_font" ]; then
+ui_font="${UI_FONT:-}"
+if [ -n "$ui_font" ] && [ -f "$ui_font" ]; then
   pybin="$(command -v python3 || true)"
   if [ -n "$pybin" ] && ! "$pybin" -c "import fontTools" 2>/dev/null; then
     venv="${FONT_VENV:-/tmp/drtcs-ftenv}"
@@ -53,7 +59,7 @@ if [ -f "$ui_font" ]; then
     echo "!! fonttools 不可用,已内嵌完整字体(体积较大);装 fonttools 可自动子集化" >&2
   fi
 else
-  echo "!! UI_FONT not found: $ui_font (GUI 中文会缺字;设置 UI_FONT 指向一个中文 ttf)" >&2
+  echo "!! 未设置有效 UI_FONT;遗留 GUI 不会嵌入中文字体" >&2
 fi
 
 target_json=""
@@ -136,9 +142,9 @@ cat > "$assets/manifest.json" <<EOF
 {
   "schema": 1,
   "description": "DELTARUNE Keucher Mod + CHS coexist patch set. Third-party derived content; apply only to a matching clean vanilla install.",
-  "keucher_mod_version": "v5.10.7",
-  "keucher_mod_commit": "f3437becd845f34ce9cabe2709fb36e7e549a8be",
-  "deltarune_chinese_commit": "824524b6c86b4b902ba13ee6c5483f3cfeef3cec",
+  "keucher_mod_version": "$keucher_version",
+  "keucher_mod_commit": "$keucher_commit",
+  "deltarune_chinese_commit": "$deltarune_chinese_commit",
   "targets": [
 $target_json
   ],

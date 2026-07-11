@@ -1,0 +1,32 @@
+name: Repository checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq ripgrep
+      - name: Check shell syntax
+        run: |
+          bash -n build.sh install_output.sh
+          find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: Check locked inputs and adapters
+        run: |
+          ./scripts/check_version_lock.sh
+          test -z "$(git submodule status --recursive | sed -n '/^[-+U]/p')"
+      - name: Check publish tree
+        run: ./scripts/check_publish_tree.sh
+      - name: Check whitespace
+        run: git diff --check HEAD

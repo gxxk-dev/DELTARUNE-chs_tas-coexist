@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <DeltaruneChineseDir Condition="'$(DeltaruneChineseDir)' == '' and '$(DELTARUNE_CHINESE_DIR)' != ''">$(DELTARUNE_CHINESE_DIR)</DeltaruneChineseDir>
-    <DeltaruneChineseDir Condition="'$(DeltaruneChineseDir)' == ''">../../work/DeltaruneChinese</DeltaruneChineseDir>
+    <DeltaruneChineseDir Condition="'$(DeltaruneChineseDir)' == ''">../../upstream/DeltaruneChinese</DeltaruneChineseDir>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Underanalyzer">

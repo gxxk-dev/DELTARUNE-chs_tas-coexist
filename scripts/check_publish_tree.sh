@@ -13,12 +13,15 @@ fail=0
 max_bytes=$((10 * 1024 * 1024))
 
 while IFS= read -r -d '' file; do
+  if [ ! -e "$file" ] && [ ! -L "$file" ]; then
+    continue
+  fi
   case "$file" in
-    build/*|output/*|backups/*|work/*|latest_backup.txt)
+    build/*|output/*|backups/*|work/*|patchset/*|patchsets/*|Packager/*|latest_backup.txt|latest_*_backup.txt)
       echo "blocked local asset path: $file" >&2
       fail=1
       ;;
-    *.win|*.bps|*.xdelta|*.mp4|*.exe|*.dll|*.ttf|*.otf)
+    *.win|*.bps|*.xdelta|*.mp4|*.ogg|*.wav|*.exe|*.dll|*.ttf|*.otf|*.zip|*.tar.gz|*.7z|*.rar)
       echo "blocked binary asset: $file" >&2
       fail=1
       ;;
@@ -27,6 +30,11 @@ while IFS= read -r -d '' file; do
       fail=1
       ;;
   esac
+
+  if [ -L "$file" ]; then
+    echo "blocked symbolic link: $file" >&2
+    fail=1
+  fi
 
   if [ -f "$file" ]; then
     size="$(wc -c < "$file")"

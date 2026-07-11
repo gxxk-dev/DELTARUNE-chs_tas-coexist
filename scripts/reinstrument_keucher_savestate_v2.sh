@@ -9,6 +9,8 @@ fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 probe_project=${DATAWIN_PROBE_PROJECT:-"$root/tools/DataWinProbe"}
+dotnet_run=(dotnet run --project "$probe_project")
+[[ ${DATAWIN_PROBE_NO_RESTORE:-0} == 1 ]] && dotnet_run+=(--no-restore)
 workspace=$1
 result_dir=${2:-"$workspace/result"}
 
@@ -32,7 +34,7 @@ for chapter in 1 2 3 4 5; do
     fi
 
     echo "Reinstrumenting chapter $chapter"
-    dotnet run --project "$probe_project" -- \
+    "${dotnet_run[@]}" -- \
         reinstrument-savestate-v2 "$data_win" "$imports" "$data_win"
 done
 

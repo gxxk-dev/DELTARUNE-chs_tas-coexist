@@ -29,13 +29,6 @@ for file in "$credits" "$initializer" "$terracota" "$cliff_scene"; do
     fi
 done
 
-perl -0pi -e 's/new scr_credit\(\[stringsetloc\("-Area & Fashion Concept Art-", "scr_credit_slash_scr_credit_gml_58_0"\)\], \[stringset\("Gigi DG"\)\]\)/new scr_credit([stringsetloc("-Concept Art-", "scr_credit_slash_scr_credit_gml_58_0")], [stringsetloc("Gigi DG (Susie outfits)", "scr_credit_slash_scr_credit_gml_62_0"), stringsetloc("Matt Cummings (Festival)", "scr_credit_slash_scr_credit_gml_63_0")])/g' "$credits"
-perl -0pi -e 's/(new scr_credit\(\[stringsetloc\("-Guest Bullet Program-", "scr_credit_slash_scr_credit_gml_74_0"\)\], \[stringset\("Eebrozgi"\)\]\))\];/$1, new scr_credit([stringsetloc("-Platforming VFX-", "scr_credit_slash_scr_credit_gml_82_0")], [stringset("Zu Ehtisham")])];/g' "$credits"
-perl -0pi -e 's/\Qstringset("Itoki Hana")]), new scr_credit([stringsetloc("-Anime Cutscene SFX-",\E/stringset("Itoki Hana")]), new scr_credit([stringsetloc("-Musical Assistance-", "scr_credit_slash_scr_credit_gml_273_0")], [stringset("Marcy Nabors")]), new scr_credit([stringsetloc("-Anime Cutscene SFX-",/g' "$credits"
-
-perl -0pi -e 's/v0\.0\.244/v0.0.247/g' "$initializer"
-perl -0pi -e 's/scr_turntimer\(270\)/scr_turntimer(275)/g; s/scr_turntimer\(240\)/scr_turntimer(245)/g; s/scr_turntimer\(360\)/scr_turntimer(365)/g' "$terracota"
-
 if ! rg -q 'stringsetloc\("-Concept Art-"' "$credits" ||
     ! rg -q 'stringsetloc\("-Platforming VFX-"' "$credits" ||
     ! rg -q 'stringsetloc\("-Musical Assistance-"' "$credits" ||
@@ -58,4 +51,4 @@ if [[ "$(rg -c 'interjection = -1;' "$cliff_scene")" -lt 2 ]]; then
     exit 1
 fi
 
-echo "Merged DELTARUNE v0.0.247 Chapter 5 fixes into CHS imports"
+echo "Verified DeltaruneChinese already includes DELTARUNE v0.0.247 Chapter 5 fixes"

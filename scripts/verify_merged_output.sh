@@ -3,6 +3,8 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 probe_project=${DATAWIN_PROBE_PROJECT:-"$root/tools/DataWinProbe"}
+dotnet_run=(dotnet run --project "$probe_project")
+[[ ${DATAWIN_PROBE_NO_RESTORE:-0} == 1 ]] && dotnet_run+=(--no-restore)
 output=${1:-"$root/output"}
 conflicts=${CODE_CONFLICT_OUT:-"$root/verify/code_conflicts_v5.10.7"}
 tmp_dir="$(mktemp -d)"
@@ -37,7 +39,7 @@ decompile() {
     local data_win=$1
     local code_name=$2
     local destination=$3
-    dotnet run --project "$probe_project" -- decompile "$data_win" "$code_name" > "$destination"
+    "${dotnet_run[@]}" -- decompile "$data_win" "$code_name" > "$destination"
 }
 
 require_file "$output/data.win"
@@ -102,7 +104,7 @@ done
 
 mod_init="$tmp_dir/ch5-mod-init.gml"
 decompile "$output/chapter5_windows/data.win" gml_GlobalScript_mod_init "$mod_init"
-manager_id="$(dotnet run --project "$probe_project" -- object-index "$output/chapter5_windows/data.win" obj_savestate_manager)"
+manager_id="$("${dotnet_run[@]}" -- object-index "$output/chapter5_windows/data.win" obj_savestate_manager)"
 require_pattern "create_array\\([^)]*([^0-9]|^)${manager_id}([^0-9]|$)" "$mod_init" "Chapter 5 mod_init does not keep the savestate manager alive"
 
 for code_name in gml_Object_obj_pause_emulator_Create_0 gml_Object_obj_time_Create_0 gml_Object_obj_time_Step_1; do

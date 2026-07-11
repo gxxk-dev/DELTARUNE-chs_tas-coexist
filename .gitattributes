@@ -5,6 +5,8 @@
 *.csproj text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.json text eol=lf
+*.patch text eol=lf whitespace=-trailing-space
 *.tsv text eol=lf
 *.txt text eol=lf
 
@@ -12,7 +14,12 @@
 *.bps binary
 *.xdelta binary
 *.mp4 binary
+*.ogg binary
+*.wav binary
 *.exe binary
 *.dll binary
 *.png binary
 *.jpg binary
+*.zip binary
+*.7z binary
+*.rar binary

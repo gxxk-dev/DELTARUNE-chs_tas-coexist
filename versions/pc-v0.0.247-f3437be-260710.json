@@ -1,0 +1,274 @@
+{
+  "schema": 2,
+  "id": "pc-v0.0.247-f3437be-260710",
+  "platform": "windows-linux-proton",
+  "deltarune": {
+    "version": "v0.0.247",
+    "files": [
+      {
+        "id": "main",
+        "rel": "data.win",
+        "bytes": 2952450,
+        "sha256": "579530459f9efaca58887e5ac36082d1d04ad914d6db3cade886ccb98da77113",
+        "keucher_sha256": "5f49e82685c35f07320e4cd17639d27207ecb9c70a81a01018268297f528df33",
+        "output_sha256": "548d07d75812ae04d218dd342cc06404a30c7fe57d70bbf2e7c54b71d036286f"
+      },
+      {
+        "id": "ch1",
+        "rel": "chapter1_windows/data.win",
+        "bytes": 13072876,
+        "sha256": "82c2bb61b8d78cd287120f6301588fecba34ec5a890bac711b7a8774c760ec70",
+        "keucher_sha256": "84c906835b0364300f490c7673f33fde729c9a7c62ae53cf0edced1ad9621a50",
+        "output_sha256": "53e4434f7209e90f8a1b5fd6f2d4625f9d87a07d17a67b843b6e7932d718835d"
+      },
+      {
+        "id": "ch2",
+        "rel": "chapter2_windows/data.win",
+        "bytes": 66951062,
+        "sha256": "116dcb1dda3517634571417fbe1db862d6381008526a4bf8ebde8ca88b7dc5f1",
+        "keucher_sha256": "66b07e9ecca43936cffe9c0e2482a5c7fa09ec7b28b6a3ecb5d450d2bbb59eaf",
+        "output_sha256": "2e33eea9bc69bdbd34589e95793b3d576b885dd96db993b0f54d35ca76a67ed2"
+      },
+      {
+        "id": "ch3",
+        "rel": "chapter3_windows/data.win",
+        "bytes": 126244594,
+        "sha256": "f24458adcd1faf8d8ba432addea03fc265adf831e7fd92c130d92a87bb858dc5",
+        "keucher_sha256": "37d2a7be703836362a46405e6230c6afb1e028691250d1b01de265e49058b7d7",
+        "output_sha256": "73eb50cdbb10c2f97802f07f377b2bbbcc463be27de92f26dc95aa3f415c6a6c"
+      },
+      {
+        "id": "ch4",
+        "rel": "chapter4_windows/data.win",
+        "bytes": 131891262,
+        "sha256": "0e6c152582df6b9884360b2010df38ff20f9b6d1ba49e87601e4c57b9f1c1abb",
+        "keucher_sha256": "6d4bb2b722aba8dc2697296225c61e631a78011815737d4fae8cbab4714abdf9",
+        "output_sha256": "286cbcd1990b277b1af0b93c57135fc193c6fa0d3f23b029360d7c5aba0f7099"
+      },
+      {
+        "id": "ch5",
+        "rel": "chapter5_windows/data.win",
+        "bytes": 165299868,
+        "sha256": "81f86fb98bdd9f3de029043adbb453f276a9fb7e26a4db1f3ee0ae3675e81c5a",
+        "keucher_sha256": "38b1c285827f4795d464d33fb43eb6e6a1b4981c5fcbe309e5b39dd11a32eeb5",
+        "output_sha256": "4ae008406d8e1f59109fc807b968f3e9ca892df2f4fa70cb592976f4ef166670"
+      }
+    ],
+    "required_extras": [
+      {
+        "rel": "chapter5_windows/vid/ch5_intro_jp.mp4",
+        "bytes": 4941285,
+        "sha256": "89b553866f166af1fe0a350aefefbc6730394e0b70f8c08b172ebc2751364214"
+      }
+    ]
+  },
+  "upstreams": {
+    "keucher": {
+      "version": "v5.10.7-1-gf3437be",
+      "path": "upstream/keucher-mod",
+      "url": "https://github.com/nhaar/keucher-mod.git",
+      "source_commit": "f3437becd845f34ce9cabe2709fb36e7e549a8be"
+    },
+    "ump": {
+      "version": "v4.3.0",
+      "path": "upstream/UMP",
+      "url": "https://github.com/nhaar/UMP.git",
+      "source_commit": "c08b817ad2e8ba1e7da481e468c1881f9ded7ad5",
+      "source_sha256": "8d9a797d20597fa6ac52a3f7694bf0e6d1e74b981cf84de208bb6937a88666c2"
+    },
+    "deltarune_chinese": {
+      "tag": "260710",
+      "path": "upstream/DeltaruneChinese",
+      "url": "https://github.com/gm3dr/DeltaruneChinese.git",
+      "commit": "2d322c11d7b086e018bc8a9b823d18c80685d7f6"
+    }
+  },
+  "output_extras": [
+    {
+      "rel": "chapter1_windows/lang/lang_en.json",
+      "bytes": 562407,
+      "sha256": "59cde377885a7ec36d8a67b1c12fa7705ff86ae7075b19ecdf2841fd988a318a"
+    },
+    {
+      "rel": "chapter1_windows/lang/lang_en_names.json",
+      "bytes": 565679,
+      "sha256": "e4c0470e96fdfc0e23ce2983ee311a40c53fe3ada5e31718f1371a79a4cec03a"
+    },
+    {
+      "rel": "chapter1_windows/lang/lang_en_names_recruitable.json",
+      "bytes": 562546,
+      "sha256": "1d7eff86f4f348bf52f7ccd4fb0599cfdf3558e649ec57d7f2bd4508b0012114"
+    },
+    {
+      "rel": "chapter2_windows/lang/lang_en.json",
+      "bytes": 1132257,
+      "sha256": "56b2c11d8e54255a03952cff5b43244121268ac633518c675bbb8003f58884f0"
+    },
+    {
+      "rel": "chapter2_windows/lang/lang_en_names.json",
+      "bytes": 1139866,
+      "sha256": "22fcdf842eecfb5205e2d51550e7d2b8c2fcb59682f89ad444194b79b2b5a566"
+    },
+    {
+      "rel": "chapter2_windows/lang/lang_en_names_recruitable.json",
+      "bytes": 1132547,
+      "sha256": "94b3080a0c3d586031b898e5fecb9285a410df18a2dadb154f04a285765d7a06"
+    },
+    {
+      "rel": "chapter3_windows/lang/lang_en.json",
+      "bytes": 1141973,
+      "sha256": "7e1bc5c80d8121ea39738588596318706caca7f4593636b21d554043e9dd513e"
+    },
+    {
+      "rel": "chapter3_windows/lang/lang_en_names.json",
+      "bytes": 1148239,
+      "sha256": "fb5389e227d0b78e4e10c6513dcda98a9e7f656f7a09884ac831dd742cd8dd75"
+    },
+    {
+      "rel": "chapter3_windows/lang/lang_en_names_recruitable.json",
+      "bytes": 1142314,
+      "sha256": "d2ba571b1c6a46927f1c10685755b95ddce07701e21ccff4500ddee7b8bd1df3"
+    },
+    {
+      "rel": "chapter3_windows/vid/tennaIntroF1_compressed_28.mp4",
+      "bytes": 7792354,
+      "sha256": "46e3c8411a3a2c1b2fb20684319b27eaaaa3f95827150cfee5ff0266cea7985c"
+    },
+    {
+      "rel": "chapter3_windows/vid/tennaIntroF1_zhname_compressed_28.mp4",
+      "bytes": 7787425,
+      "sha256": "329c7dd154baa3a1e4ddd75abc37504e75ac246b14e76089fb76595e1cf3f805"
+    },
+    {
+      "rel": "chapter4_windows/lang/lang_en.json",
+      "bytes": 1330979,
+      "sha256": "59e2008def26d4e0d54e7e1d53d8ab3cc8979ca2b964428120937ba577136d36"
+    },
+    {
+      "rel": "chapter4_windows/lang/lang_en_names.json",
+      "bytes": 1338623,
+      "sha256": "3a4ca2e856c3e7e119da8f4db9b48addda144841090254d5d05715065b22fe7f"
+    },
+    {
+      "rel": "chapter4_windows/lang/lang_en_names_recruitable.json",
+      "bytes": 1331276,
+      "sha256": "7ef6c2c38d5d356782cd9393a76aa2ef583408ed47753c1d32533df9eb89c77a"
+    },
+    {
+      "rel": "chapter5_windows/lang/lang_en.json",
+      "bytes": 1471441,
+      "sha256": "fb2da5ef00066b6699b5a253f9d27a5b4f8a0b8479c39d39bc964ee8485bc809"
+    },
+    {
+      "rel": "chapter5_windows/lang/lang_en_names.json",
+      "bytes": 1478849,
+      "sha256": "62c48a59076454a9141a9ad7465f22668865f0b2dc5338afdaf23f495f5cf100"
+    },
+    {
+      "rel": "chapter5_windows/lang/lang_en_names_recruitable.json",
+      "bytes": 1471399,
+      "sha256": "71e4a8e56d6b09ee0c61715f402355d1acdbbb442d0e654f3fed8bb024057795"
+    },
+    {
+      "rel": "chapter5_windows/vid/ch5_intro_en.mp4",
+      "bytes": 6573228,
+      "sha256": "c4f642fc78c455704fadbd9a4d0d60028c0d0f9e859c47b12a94a638b1837bcd"
+    },
+    {
+      "rel": "chapter5_windows/vid/ch5_intro_jp.mp4",
+      "bytes": 4941285,
+      "sha256": "89b553866f166af1fe0a350aefefbc6730394e0b70f8c08b172ebc2751364214"
+    },
+    {
+      "rel": "vid/ch5_intro_en.mp4",
+      "bytes": 6573228,
+      "sha256": "c4f642fc78c455704fadbd9a4d0d60028c0d0f9e859c47b12a94a638b1837bcd"
+    },
+    {
+      "rel": "vid/ch5_intro_jp.mp4",
+      "bytes": 4941285,
+      "sha256": "89b553866f166af1fe0a350aefefbc6730394e0b70f8c08b172ebc2751364214"
+    }
+  ],
+  "audio": {
+    "source": "prproj/ch5宣传片/ch5_intro_audio_2026.07.03-03.28.28.wav",
+    "source_bytes": 5820238,
+    "source_sha256": "7e46e1b02c5a78bc4bc175f396104377add56ee2d2b6e4fb260aa3af2f3ca07f",
+    "fingerprint_algorithm": "chromaprint-v1",
+    "fingerprint_seconds": 30,
+    "fingerprint_min_similarity": 0.99,
+    "fingerprint_raw": "4260493183,4260419358,4243642190,4258592350,4250199806,4248105982,4281725950,4145533375,4149662143,4149629375,4141052095,4140916991,4140916991,3623055867,3581088091,3580953887,3564180783,3572579631,3572589871,3571672861,3588715277,3622294093,3605512909,3622224845,3622229469,3623351789,3614828015,3581212143,3581211007,3564426075,3564426778,3581212219,3589662315,3589793785,3623286233,3614921161,3597943257,3597943163,3614785899,3614925931,3623183467,3622134911,3622295007,3588736463,3589723549,3581404093,3564630941,3560297436,3560296924,3581400940,3581409068,3623216701,3606439453,2532696607,2532700686,2532700990,2549399850,2549399658,2515922027,3050814553,3033962824,3034025736,3025440312,2977207928,3006587592,2989843081,2989961899,2989949611,2988901034,2993488314,4075033754,4075033754,4070907034,3534175386,1386622154,1390816458,1390896202,1382540363,1399165979,1399297083,1365676089,1365676057,1365676057,1348833305,1411706936,1411506216,1411637544,2082628137,2086893097,2095271465,2095271449,2111962633,2079387145,2079385355,2060572443,4208064315,4224775977,3679508265,3646015289,3654408057,2580670329,2576479611,2609993067,2614116479,2614317118,2614284318,2614292766,2612195646,2612261423,2582696489,2582693432,2572211736,2568082952,3104896568,3104888360,3104888360,3104896568,3104896824,2825934681,2826192219,2826257914,3967091178,3967095194,3967103370,3967103370,3967234522,1953968362,1962357994,1962353754,1958032458,817116170,817628170,821822538,837555274,829255770,292384842,292409562,292405755,293458427,293466619,293581305,293516249,293517274,1367326650,1358806954,1358733242,1358798746,3504182938,3587814042,3587814074,3587945146,3617239738,2545595311,2549785069,2549851628,2675555828,2670443636,2670656580,2670656836,2535879748,2671199605,2675393903,2683790702,2677503326,2543281502,2547340630,2547369854,2549471102,2549470583,2515924340,2515858516,2507436116,2487054532,2487169436,2503938748,2541621932,3070105279,4143920830,4277958314,4277991146,4294756138,4234710283,4230584840,3156847112,3173624328,2905194008,2938676792,2905137960,2845360616,2827600296,2827731880,2895790761,2908423083,3208129962,3191343338,3194554490,3203209242,4205788170,4209910794,4201521162,3660144650,3660181530,4184523802,4172977226,4172987593,4172986312,4172911240,3706229416,3697865384,3693621945,3727172266,3727172266,4264104106,4134076586,3605594330,3601338378,3567989770,3567942667,1152314123,1156509195,1147975195",
+    "codec": "vorbis",
+    "sample_rate": 48000,
+    "channels": 2,
+    "duration": 30.313333,
+    "quality": 9,
+    "outputs": [
+      "chapter5_windows/mus/ch5_intro_audio.ogg",
+      "mus/ch5_intro_audio.ogg"
+    ]
+  },
+  "tools": {
+    "undertale_mod_cli": {
+      "version": "0.9.1.1",
+      "reported_version": "1.0.0+9774d0920e1ef1b7d593702ecf109cc50b42e44f",
+      "url": "https://github.com/UnderminersTeam/UndertaleModTool/releases/download/0.9.1.1/UTMT_CLI_v0.9.1.1-Ubuntu.zip",
+      "archive": "UTMT_CLI_v0.9.1.1-Ubuntu.zip",
+      "bytes": 67437770,
+      "sha256": "abfebb655114664c4173843a625cdc294febc497eb55cd86f95c4609aa7332a7",
+      "members": [
+        {
+          "rel": "UndertaleModCli",
+          "bytes": 78256,
+          "sha256": "255b38e95c74c9136a00bcf1f4c470ef1898eadcdfc340d092b682e58b0d22b1"
+        },
+        {
+          "rel": "UndertaleModCli.dll",
+          "bytes": 60928,
+          "sha256": "45fc4aeee89e788873dfa3f074adab257a53ada542c501f771c90e4615e67a02"
+        },
+        {
+          "rel": "UndertaleModLib.dll",
+          "bytes": 1103360,
+          "sha256": "93e2506cd0c8073b6e7f19e403677f457e9f7ccf5cb4bb46639aa229053f2a60"
+        },
+        {
+          "rel": "Magick.Native-Q8-x64.dll.so",
+          "bytes": 36919024,
+          "sha256": "54dd70bb36dfc64631cbac5eb26fdfbc313b6c77a1b19829fc45ce2462a88266"
+        }
+      ]
+    },
+    "flips": {
+      "version": "v198",
+      "url": "https://github.com/Alcaro/Flips/releases/download/v198/flips-linux.zip",
+      "archive": "flips-linux.zip",
+      "bytes": 62792,
+      "sha256": "3b20edcbf9ee0da511b2ac3735dd812271f1432183350cd119665f347fcfb9ec",
+      "members": [
+        {
+          "rel": "flips",
+          "bytes": 111336,
+          "sha256": "d2db1b2ef39c7168df6bf627f87f38e1758143448fe963a9b4877f66ad954930"
+        }
+      ]
+    }
+  },
+  "adapters": {
+    "keucher": {
+      "rel": "adapters/keucher-f3437be-linux.patch",
+      "bytes": 5732,
+      "sha256": "5e9c1750b52010d1514a707f2ec6d3b72275e02ec6adff127e47967147376769"
+    },
+    "deltarune_chinese": {
+      "rel": "adapters/deltarune-chinese-260710.patch",
+      "bytes": 9794,
+      "sha256": "30d27f993acc42351fe3e8be7a2945f4cdc05946a44782b8eeace1fbdc83ec74"
+    },
+    "packages_lock": {
+      "rel": "adapters/deltarune-chinese-260710.packages.lock.json",
+      "bytes": 1695,
+      "sha256": "e7bf7a1034cf7749352dd0c770d894b51ea2f937a793a4611297c85985f4a415"
+    }
+  }
+}

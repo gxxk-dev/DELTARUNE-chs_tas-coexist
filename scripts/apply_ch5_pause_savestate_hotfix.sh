@@ -9,6 +9,8 @@ fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 probe_project=${DATAWIN_PROBE_PROJECT:-"$root/tools/DataWinProbe"}
+dotnet_run=(dotnet run --project "$probe_project")
+[[ ${DATAWIN_PROBE_NO_RESTORE:-0} == 1 ]] && dotnet_run+=(--no-restore)
 data_win=$1
 output_win=${2:-$data_win}
 
@@ -37,23 +39,23 @@ patch_loading_guard() {
     local code_name=$1
     local gml_file="$tmp_dir/${code_name}.gml"
 
-    dotnet run --project "$probe_project" -- decompile "$output_win" "$code_name" > "$gml_file"
+    "${dotnet_run[@]}" -- decompile "$output_win" "$code_name" > "$gml_file"
     perl -0pi -e 's/if \((?:instance_exists\((?:obj_savestate_manager|[0-9]+)\) && )?(?:obj_savestate_manager|[0-9]+)\.loading\)/if (instance_exists(obj_savestate_manager) && obj_savestate_manager.loading)/g' "$gml_file"
     if ! rg -q "instance_exists\\(obj_savestate_manager\\).*obj_savestate_manager\\.loading" "$gml_file"; then
         echo "Failed to patch loading guard in $code_name" >&2
         exit 1
     fi
-    dotnet run --project "$probe_project" -- replace-code "$output_win" "$code_name" "$gml_file" "$output_win"
+    "${dotnet_run[@]}" -- replace-code "$output_win" "$code_name" "$gml_file" "$output_win"
 }
 
-manager_id="$(dotnet run --project "$probe_project" -- object-index "$output_win" obj_savestate_manager)"
+manager_id="$("${dotnet_run[@]}" -- object-index "$output_win" obj_savestate_manager)"
 if [[ ! "$manager_id" =~ ^[0-9]+$ ]]; then
     echo "Failed to resolve obj_savestate_manager object index" >&2
     exit 1
 fi
 
 mod_init="$tmp_dir/gml_GlobalScript_mod_init.gml"
-dotnet run --project "$probe_project" -- decompile "$output_win" gml_GlobalScript_mod_init > "$mod_init"
+"${dotnet_run[@]}" -- decompile "$output_win" gml_GlobalScript_mod_init > "$mod_init"
 if ! rg -q "create_array\\([^)]*([^0-9]|^)${manager_id}([^0-9]|$)" "$mod_init"; then
     if ! rg -q "var omnipresent_instances = create_array\\([^)]*\\);" "$mod_init"; then
         echo "Expected Ch5 Keucher omnipresent instance list not found in mod_init" >&2
@@ -65,7 +67,7 @@ if ! rg -q "create_array\\([^)]*([^0-9]|^)${manager_id}([^0-9]|$)" "$mod_init"; 
     echo "Failed to add obj_savestate_manager to mod_init" >&2
     exit 1
 fi
-dotnet run --project "$probe_project" -- replace-code "$output_win" gml_GlobalScript_mod_init "$mod_init" "$output_win"
+"${dotnet_run[@]}" -- replace-code "$output_win" gml_GlobalScript_mod_init "$mod_init" "$output_win"
 
 patch_loading_guard gml_Object_obj_pause_emulator_Create_0
 patch_loading_guard gml_Object_obj_time_Create_0

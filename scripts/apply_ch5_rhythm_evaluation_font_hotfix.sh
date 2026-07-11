@@ -10,6 +10,8 @@ fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 probe_project=${DATAWIN_PROBE_PROJECT:-"$root/tools/DataWinProbe"}
+dotnet_run=(dotnet run --project "$probe_project")
+[[ ${DATAWIN_PROBE_NO_RESTORE:-0} == 1 ]] && dotnet_run+=(--no-restore)
 tmp_dir="$(mktemp -d)"
 
 cleanup() {
@@ -53,7 +55,7 @@ patch_code() {
     local code_name=$2
     local gml_file="$tmp_dir/${code_name}_$(basename "$(dirname "$data_win")").gml"
 
-    dotnet run --project "$probe_project" -- decompile "$data_win" "$code_name" > "$gml_file"
+    "${dotnet_run[@]}" -- decompile "$data_win" "$code_name" > "$gml_file"
 
     perl -0pi -e 's/draw_set_font\(2\);/draw_set_font(scr_84_get_font("main"));/g' "$gml_file"
 
@@ -63,7 +65,7 @@ patch_code() {
         exit 1
     fi
 
-    dotnet run --project "$probe_project" -- replace-code "$data_win" "$code_name" "$gml_file" "$data_win"
+    "${dotnet_run[@]}" -- replace-code "$data_win" "$code_name" "$gml_file" "$data_win"
 }
 
 mapfile -t targets < <(

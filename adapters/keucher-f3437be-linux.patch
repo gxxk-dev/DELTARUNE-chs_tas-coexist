@@ -1,0 +1,125 @@
+diff --git a/src/main.csx b/src/main.csx
+--- a/src/main.csx
++++ b/src/main.csx
+@@ -1,6 +1,6 @@
+-#load "ump\ump.csx"
++#load "ump/ump.csx"
+ #load "enums.csx"
+-#load "savestate\savestate.csx"
++#load "savestate/savestate.csx"
+ 
+ using ImageMagick;
+ using System.Linq;
+@@ -29,12 +29,12 @@ class KeucherModLoader : UMPLoader
+             return true;
+         }
+ 
+-        if (filePath.Contains("demo\\") && Version != DeltaruneVersion.Demo)
++        if (filePath.Contains("demo/") && Version != DeltaruneVersion.Demo)
+         {
+             return false;
+         }
+ 
+-        var isChapterSelect = filePath.Contains("chapter_select\\");
++        var isChapterSelect = filePath.Contains("chapter_select/");
+         // chapter select is isolated
+         if (Version == DeltaruneVersion.ChapterSelect)
+         {
+diff --git a/src/ump/ump.csx b/src/ump/ump.csx
+--- a/src/ump/ump.csx
++++ b/src/ump/ump.csx
+@@ -128,7 +128,10 @@ abstract class UMPLoader
+         string[] searchPatterns = new[] { "*.gml", "*.asm" };
+         if (Directory.Exists(absoluteCodePath))
+         {
+-            files = searchPatterns.SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories)).ToArray();
++            files = searchPatterns
++                .SelectMany(pattern => Directory.GetFiles(absoluteCodePath, pattern, SearchOption.AllDirectories))
++                .OrderBy(path => Path.GetRelativePath(absoluteCodePath, path), StringComparer.Ordinal)
++                .ToArray();
+         }
+         else
+         {
+diff --git a/src/mod/common/debug_room/ch5/gml_GlobalScript_scr_get_room_by_id.gml b/src/mod/common/debug_room/ch5/gml_GlobalScript_scr_get_room_by_id.gml
+--- a/src/mod/common/debug_room/ch5/gml_GlobalScript_scr_get_room_by_id.gml
++++ b/src/mod/common/debug_room/ch5/gml_GlobalScript_scr_get_room_by_id.gml
+@@ -10,9 +10,3 @@
+         (global.chapter * 10000) - (room_battletest - 1)
+     );
+ /// END
+-
+-/// REPLACE
+-new scr_room(room_animexampletest, 50093), new scr_room(rm_blank, 50094), new scr_room(room_climbtest, 50095)
+-/// CODE
+-new scr_room(room_animexampletest, 50093), new scr_room(room_climbtest, 50095)
+-/// END
+\ No newline at end of file
+diff --git a/src/mod/sprites/ImportGraphics/ImportGraphics.csx b/src/mod/sprites/ImportGraphics/ImportGraphics.csx
+--- a/src/mod/sprites/ImportGraphics/ImportGraphics.csx
++++ b/src/mod/sprites/ImportGraphics/ImportGraphics.csx
+@@ -46,11 +46,13 @@ try
+     {
+         string atlasName = Path.Combine(packDir, $"{prefix}{atlasCount:000}.png");
+         using MagickImage atlasImage = TextureWorker.ReadBGRAImageFromFile(atlasName);
++        atlasImage.Strip();
++        atlasImage.Settings.SetDefine(MagickFormat.Png, "exclude-chunks", "date,time");
+         IPixelCollection<byte> atlasPixels = atlasImage.GetPixels();
+ 
+         UndertaleEmbeddedTexture texture = new();
+         texture.Name = new UndertaleString($"Texture {++lastTextPage}");
+-        texture.TextureData.Image = GMImage.FromMagickImage(atlasImage).ConvertToPng();
++        texture.TextureData.Image = GMImage.FromPng(atlasImage.ToByteArray(MagickFormat.Png));
+         Data.EmbeddedTextures.Add(texture);
+ 
+         foreach (Node n in atlas.Nodes)
+@@ -393,8 +393,11 @@ public class Packer
+         {
+             string atlasName = $"{prefix}{atlasCount:000}.png";
+ 
+-            using (MagickImage img = CreateAtlasImage(atlas))
++            using (MagickImage img = CreateAtlasImage(atlas))
++            {
++                img.Strip();
+                 TextureWorker.SaveImageToFile(img, atlasName);
++            }
+ 
+             foreach (Node n in atlas.Nodes)
+             {
+@@ -422,7 +422,8 @@ public class Packer
+     private void ScanForTextures(string _Path, string _Wildcard)
+     {
+         DirectoryInfo di = new(_Path);
+-        FileInfo[] files = di.GetFiles(_Wildcard, SearchOption.AllDirectories);
++        FileInfo[] files = di.GetFiles(_Wildcard, SearchOption.AllDirectories)
++            .OrderBy(file => file.FullName, StringComparer.Ordinal).ToArray();
+         foreach (FileInfo fi in files)
+         {
+             (int width, int height) = TextureWorker.GetImageSizeFromFile(fi.FullName);
+@@ -641,7 +642,8 @@ string CheckValidity()
+ 
+     bool hadMessage = false;
+     string currSpriteName = null;
+-    string[] dirFiles = Directory.GetFiles(importFolder, "*.png", SearchOption.AllDirectories);
++    string[] dirFiles = Directory.GetFiles(importFolder, "*.png", SearchOption.AllDirectories)
++        .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+     foreach (string file in dirFiles)
+     {
+         string FileNameWithExtension = Path.GetFileName(file);
+@@ -668,7 +670,8 @@ string CheckValidity()
+             }
+         }
+ 
+-        string[] dupFiles = Directory.GetFiles(importFolder, FileNameWithExtension, SearchOption.AllDirectories);
++        string[] dupFiles = Directory.GetFiles(importFolder, FileNameWithExtension, SearchOption.AllDirectories)
++            .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+         if (dupFiles.Length > 1)
+             throw new ScriptException("Duplicate file detected. There are " + dupFiles.Length + " files named: " + FileNameWithExtension);
+ 
+@@ -689,6 +692,7 @@ string CheckValidity()
+                 continue;
+             
+             string[][] spriteFrames = Directory.GetFiles(importFolder, $"{spriteName}_*.png", SearchOption.AllDirectories)
++                                               .OrderBy(path => path, StringComparer.Ordinal)
+                                                .Select(x =>
+                                                {
+                                                   var match = sprFrameRegex.Match(Path.GetFileNameWithoutExtension(x));

@@ -20,6 +20,8 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
 probe_project=${DATAWIN_PROBE_PROJECT:-tools/DataWinProbe}
+dotnet_run=(dotnet run --project "$probe_project")
+[[ ${DATAWIN_PROBE_NO_RESTORE:-0} == 1 ]] && dotnet_run+=(--no-restore)
 savestate_code_name=gml_Object_obj_savestate_manager_Create_0
 readable_step_code_name=gml_Object_obj_readable_room1_Step_0
 
@@ -37,7 +39,7 @@ for chapter in 1 2 3 4 5; do
 
     manager_file="$import_dir/${savestate_code_name}.gml"
     manager_tmp="${manager_file}.baseline.tmp"
-    dotnet run --project "$probe_project" -- decompile "$data_win" "$savestate_code_name" > "$manager_tmp"
+    "${dotnet_run[@]}" -- decompile "$data_win" "$savestate_code_name" > "$manager_tmp"
     if ! rg -q "function decode_data_type\\(" "$manager_tmp" ||
         ! rg -q "game_display_name" "$manager_tmp" ||
         ! rg -q "asset_get_index\\(arg0\\.const_func\\)" "$manager_tmp"; then
@@ -94,7 +96,7 @@ for chapter in 1 2 3 4 5; do
     output_file="$import_dir/${readable_step_code_name}.gml"
     tmp_file="${output_file}.tmp"
 
-    dotnet run --project "$probe_project" -- decompile "$data_win" "$readable_step_code_name" > "$tmp_file"
+    "${dotnet_run[@]}" -- decompile "$data_win" "$readable_step_code_name" > "$tmp_file"
     if ! rg -q "if \\(myinteract == 3\\)" "$tmp_file"; then
         echo "Expected obj_readable_room1 Step pattern not found for chapter $chapter" >&2
         rm -f "$tmp_file"

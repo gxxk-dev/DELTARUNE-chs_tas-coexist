@@ -41,6 +41,48 @@ static bool NeedsSavestateLoadingGuard(string codeName)
         || codeName.EndsWith("_PreCreate", StringComparison.Ordinal);
 }
 
+static bool IsSavestateInstrumentationInfrastructure(string codeName)
+{
+    return codeName is "gml_GlobalScript_helper_functions"
+        or "gml_GlobalScript_logged_functions"
+        || codeName.StartsWith("gml_Object_obj_savestate_manager_", StringComparison.Ordinal);
+}
+
+static bool HasSavestateLoadingGuard(string content)
+{
+    const string guardPattern = @"\A\s*if\s*\(\s*(?:instance_exists\(\s*obj_savestate_manager\s*\)\s*&&\s*)?obj_savestate_manager\.loading\s*\)\s*(?:\{\s*exit\s*;\s*\}|exit\s*;)";
+    return Regex.IsMatch(content, guardPattern, RegexOptions.CultureInvariant);
+}
+
+static void WriteAtomically(string outputPath, UndertaleData data)
+{
+    string fullOutputPath = Path.GetFullPath(outputPath);
+    string? directory = Path.GetDirectoryName(fullOutputPath);
+    if (directory == null) throw new Exception($"Output path has no parent directory: {outputPath}");
+    Directory.CreateDirectory(directory);
+
+    string temporaryPath = Path.Combine(
+        directory,
+        $".{Path.GetFileName(fullOutputPath)}.{Guid.NewGuid():N}.tmp");
+    try
+    {
+        using (FileStream output = new(
+            temporaryPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None))
+        {
+            UndertaleIO.Write(output, data);
+            output.Flush(true);
+        }
+        File.Move(temporaryPath, fullOutputPath, true);
+    }
+    finally
+    {
+        if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+    }
+}
+
 static string ReinstrumentSavestateV2(string codeName, string content, out int replacements, out bool guardAdded)
 {
     string[] loggedFunctions =
@@ -69,9 +111,8 @@ static string ReinstrumentSavestateV2(string codeName, string content, out int r
     }
 
     guardAdded = false;
-    const string guardPattern = @"\A\s*if\s*\(\s*(?:instance_exists\([^)]*\)\s*&&\s*)?(?:obj_savestate_manager|\d+)\.loading\s*\)";
     if (NeedsSavestateLoadingGuard(codeName)
-        && !Regex.IsMatch(content, guardPattern, RegexOptions.CultureInvariant))
+        && !HasSavestateLoadingGuard(content))
     {
         content = "if (obj_savestate_manager.loading) exit;" + Environment.NewLine + content;
         guardAdded = true;
@@ -97,8 +138,7 @@ static void AssertNoRawSavestateV2Calls(string codeName, string content)
     }
 
     if (!NeedsSavestateLoadingGuard(codeName)) return;
-    const string guardPattern = @"\A\s*if\s*\(\s*(?:instance_exists\([^)]*\)\s*&&\s*)?(?:obj_savestate_manager|\d+)\.loading\s*\)";
-    if (!Regex.IsMatch(content, guardPattern, RegexOptions.CultureInvariant))
+    if (!HasSavestateLoadingGuard(content))
         throw new Exception($"Savestate loading guard is missing from {codeName}");
 }
 
@@ -129,20 +169,38 @@ switch (command)
     case "changed-code-list":
         if (args.Length < 3) throw new Exception("changed-code-list requires <modified.win>");
         UndertaleData modifiedData = Load(args[2]);
-        foreach (var code in data.Code.Where(x => x?.ParentEntry is null).OrderBy(x => x.Name.Content))
+        HashSet<string> baseRoots = data.Code
+            .Where(x => x?.ParentEntry is null)
+            .Select(x => x.Name.Content)
+            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> modifiedRoots = modifiedData.Code
+            .Where(x => x?.ParentEntry is null)
+            .Select(x => x.Name.Content)
+            .ToHashSet(StringComparer.Ordinal);
+        List<string> changedCode = [];
+        List<string> decompileFailures = [];
+        foreach (string codeName in baseRoots.Union(modifiedRoots).Order(StringComparer.Ordinal))
         {
-            string codeName = code.Name.Content;
-            if (modifiedData.Code.ByName(codeName) == null) continue;
+            if (!baseRoots.Contains(codeName) || !modifiedRoots.Contains(codeName))
+            {
+                changedCode.Add(codeName);
+                continue;
+            }
             try
             {
                 if (Hash(Decompile(data, codeName)) != Hash(Decompile(modifiedData, codeName)))
-                    Console.WriteLine(codeName);
+                    changedCode.Add(codeName);
             }
-            catch
+            catch (Exception exception)
             {
-                // Ignore malformed or compiler-generated roots that cannot be decompiled consistently.
+                decompileFailures.Add($"{codeName}: {exception.Message}");
             }
         }
+        if (decompileFailures.Count > 0)
+            throw new Exception(
+                "Unable to compare root code entries:\n  "
+                + string.Join("\n  ", decompileFailures));
+        foreach (string codeName in changedCode) Console.WriteLine(codeName);
         break;
     case "grep-strings":
         if (args.Length < 3) throw new Exception("grep-strings requires a term");
@@ -193,8 +251,7 @@ switch (command)
         CompileResult compileResult = importGroup.Import();
         if (!compileResult.Successful)
             throw new Exception(compileResult.PrintAllErrors(true));
-        using (FileStream output = new(outputPath, FileMode.Create, FileAccess.Write))
-            UndertaleIO.Write(output, data);
+        WriteAtomically(outputPath, data);
         break;
     case "compare-code":
         if (args.Length < 5) throw new Exception("compare-code requires <keucher.win> <merged.win> <code-list>");
@@ -237,14 +294,21 @@ switch (command)
         int changedCodes = 0;
         int guardedCodes = 0;
         int callReplacementGroups = 0;
-        foreach (string importPath in Directory.GetFiles(importsCodeDir, "*.gml").Order())
+        string[] importPaths = Directory.GetFiles(importsCodeDir, "*.gml").Order().ToArray();
+        string[] missingImports = importPaths
+            .Select(Path.GetFileNameWithoutExtension)
+            .OfType<string>()
+            .Where(codeName => data.Code.ByName(codeName) == null)
+            .ToArray();
+        if (missingImports.Length > 0)
+            throw new Exception(
+                "Imported code entries are missing from data.win:\n  "
+                + string.Join("\n  ", missingImports));
+
+        foreach (string importPath in importPaths)
         {
             string codeName = Path.GetFileNameWithoutExtension(importPath);
-            if (data.Code.ByName(codeName) == null)
-            {
-                Console.Error.WriteLine($"warning: imported code not found in data.win: {codeName}");
-                continue;
-            }
+            if (IsSavestateInstrumentationInfrastructure(codeName)) continue;
 
             string original = Decompile(data, codeName);
             string instrumented = ReinstrumentSavestateV2(codeName, original, out int callGroups, out bool guardAdded);
@@ -261,14 +325,13 @@ switch (command)
             if (!reinstrumentResult.Successful)
                 throw new Exception(reinstrumentResult.PrintAllErrors(true));
         }
-        foreach (string importPath in Directory.GetFiles(importsCodeDir, "*.gml").Order())
+        foreach (string importPath in importPaths)
         {
             string codeName = Path.GetFileNameWithoutExtension(importPath);
-            if (data.Code.ByName(codeName) == null) continue;
+            if (IsSavestateInstrumentationInfrastructure(codeName)) continue;
             AssertNoRawSavestateV2Calls(codeName, Decompile(data, codeName));
         }
-        using (FileStream output = new(reinstrumentedOutput, FileMode.Create, FileAccess.Write))
-            UndertaleIO.Write(output, data);
+        WriteAtomically(reinstrumentedOutput, data);
         Console.WriteLine($"reinstrumented {changedCodes} code entries ({guardedCodes} guards, {callReplacementGroups} call groups)");
         break;
     default:

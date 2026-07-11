@@ -1,0 +1,9 @@
+[submodule "upstream/keucher-mod"]
+	path = upstream/keucher-mod
+	url = https://github.com/nhaar/keucher-mod.git
+[submodule "upstream/UMP"]
+	path = upstream/UMP
+	url = https://github.com/nhaar/UMP.git
+[submodule "upstream/DeltaruneChinese"]
+	path = upstream/DeltaruneChinese
+	url = https://github.com/gm3dr/DeltaruneChinese.git
