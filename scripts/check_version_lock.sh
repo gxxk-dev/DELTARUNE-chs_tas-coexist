@@ -292,4 +292,10 @@ jq -e '
     (.dependencies["net10.0"] | type == "object" and length > 0)
 ' "$packages_lock" >/dev/null || die "invalid NuGet lock: $packages_lock"
 
+default_version_file="$root/versions/pc-v0.0.247-f3437be-260710.json"
+if [[ "$version_file" == "$default_version_file" ]]; then
+    "$root/scripts/check_ralsei_lock.sh" \
+        "$root/versions/ralsei-portraits-samuton-v1.json" "$version_file"
+fi
+
 echo "version lock check passed"

@@ -6,6 +6,18 @@ version_file="$root/versions/pc-v0.0.247-f3437be-260710.json"
 game_dir="${DELTARUNE_GAME_DIR:-}"
 output_dir="$root/output"
 patchset_dir=""
+ralsei_archive=""
+ralsei_enabled=0
+ralsei_manifest="$root/versions/ralsei-portraits-samuton-v1.json"
+ralsei_manifest_sha=""
+ralsei_asset_json=""
+ralsei_variant_json="null"
+ralsei_outputs_json="[]"
+ralsei_output_records=""
+ralsei_expected_outputs_json=""
+ralsei_expected_output_records=""
+requested_outputs_json=""
+requested_output_records=""
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/dr-tas-chs"
 work_base="${TMPDIR:-/tmp}"
 offline=0
@@ -41,6 +53,8 @@ Options:
   --output-dir DIR  Final output directory (default: ./output)
   --patchset-dir DIR
                     Also create a complete local BPS patchset
+  --ralsei-archive FILE
+                    Import the locally supplied Ralsei portrait archive
   --cache-dir DIR   Download, NuGet, and Wine cache
   --work-dir DIR    Parent directory for the temporary build workspace
   --offline         Use only cached downloads and NuGet packages
@@ -80,6 +94,12 @@ while (($#)); do
             patchset_dir=$2
             shift 2
             ;;
+        --ralsei-archive)
+            (($# >= 2)) || die "--ralsei-archive requires a path"
+            ralsei_archive=$2
+            ralsei_enabled=1
+            shift 2
+            ;;
         --work-dir)
             (($# >= 2)) || die "--work-dir requires a path"
             work_base=$2
@@ -112,10 +132,16 @@ done
 if [[ -n "$patchset_dir" ]]; then
     [[ ! -L "$patchset_dir" ]] || die "path arguments may not be symbolic links: $patchset_dir"
 fi
+if ((ralsei_enabled)); then
+    [[ ! -L "$ralsei_archive" ]] || die "the Ralsei archive may not be a symbolic link: $ralsei_archive"
+fi
 
 for command in awk chmod cmp cp curl df diff dotnet ffmpeg ffprobe find findmnt flock fpcalc gawk git id jq mktemp patch perl readlink rg sha256sum sort stat tar unzip wine; do
     command -v "$command" >/dev/null || die "missing dependency: $command"
 done
+if ((ralsei_enabled)) && ! command -v 7zz >/dev/null && ! command -v 7z >/dev/null; then
+    die "missing dependency for --ralsei-archive: 7zz or 7z"
+fi
 
 dotnet_major="$(dotnet --version | cut -d. -f1)"
 [[ "$dotnet_major" =~ ^[0-9]+$ ]] && ((dotnet_major >= 10)) ||
@@ -129,6 +155,16 @@ if [[ -n "$patchset_dir" ]]; then
 fi
 cache_dir="$(readlink -m -- "$cache_dir")"
 work_base="$(readlink -m -- "$work_base")"
+if ((ralsei_enabled)); then
+    [[ -f "$ralsei_archive" && ! -L "$ralsei_archive" ]] ||
+        die "Ralsei archive is not a regular file: $ralsei_archive"
+    [[ "$(stat -Lc %h -- "$ralsei_archive")" -eq 1 ]] ||
+        die "Ralsei archive must not be hard-linked: $ralsei_archive"
+    ralsei_archive="$(readlink -f -- "$ralsei_archive")"
+fi
+[[ -f "$ralsei_manifest" && ! -L "$ralsei_manifest" ]] ||
+    die "Ralsei portrait lock is missing or unsafe: $ralsei_manifest"
+ralsei_manifest="$(readlink -f -- "$ralsei_manifest")"
 output_parent="$(dirname -- "$output_dir")"
 
 paths_overlap() {
@@ -353,6 +389,66 @@ verify_file() {
         die "SHA256 mismatch: $path (expected $expected_sha, got $actual_sha)"
 }
 
+load_ralsei_lock() {
+    local verify_build_inputs=${1:-0}
+    local expected_inputs importer_records rel expected_bytes expected_sha
+
+    expected_inputs="$(jq -ce '[.deltarune.files[1:][] | {
+        chapter: .id, rel, input_sha256: .output_sha256
+    }]' "$version_file")" || die "could not read the Ralsei input bindings"
+    jq -e --argjson expected_inputs "$expected_inputs" '
+        def exact($keys): type == "object" and (keys | sort) == ($keys | sort);
+        def positive_integer: type == "number" and isfinite and floor == . and . > 0;
+        def digest: type == "string" and test("^[0-9a-f]{64}$");
+        exact([
+            "schema", "id", "archive", "importer", "mapping_contract", "outputs", "files"
+        ]) and
+        .schema == 2 and .id == "ralsei-portraits-samuton-v1" and
+        (.archive | exact(["filename", "format", "bytes", "sha256"]) and
+            .format == "7z" and (.bytes | positive_integer) and (.sha256 | digest)) and
+        (.importer | exact(["wrapper", "script"]) and
+            (.wrapper | exact(["rel", "bytes", "sha256"]) and
+                .rel == "scripts/apply_ralsei_portraits.sh" and
+                (.bytes | positive_integer) and (.sha256 | digest)) and
+            (.script | exact(["rel", "bytes", "sha256"]) and
+                .rel == "scripts/ralsei_portraits.csx" and
+                (.bytes | positive_integer) and (.sha256 | digest))) and
+        (.outputs | type == "array" and length == 5) and
+        all(.outputs[];
+            exact(["chapter", "rel", "input_bytes", "input_sha256", "bytes", "sha256"]) and
+            (.chapter | type == "string" and test("^ch[1-5]$")) and
+            (.rel | type == "string" and test("^chapter[1-5]_windows/data[.]win$")) and
+            (.input_bytes | positive_integer) and (.input_sha256 | digest) and
+            (.bytes | positive_integer) and (.sha256 | digest)) and
+        ([.outputs[] | {chapter, rel, input_sha256}] == $expected_inputs)
+    ' "$ralsei_manifest" >/dev/null || die "invalid Ralsei portrait machine lock"
+
+    ralsei_asset_json="$(jq -ce '{
+        id, bytes: .archive.bytes, sha256: .archive.sha256
+    }' "$ralsei_manifest")" || die "could not read the Ralsei asset identity"
+    ralsei_variant_json="$(jq -cn --argjson asset "$ralsei_asset_json" '
+        {kind: "ralsei_portraits", asset: $asset}
+    ')" || die "could not create the Ralsei variant identity"
+    ralsei_outputs_json="$(jq -ce '[.outputs[] | {rel, bytes, sha256}]' \
+        "$ralsei_manifest")" || die "could not read the Ralsei output bindings"
+    ralsei_output_records="$(jq -er \
+        '.outputs[] | [.rel, (.bytes | tostring), .sha256] | @tsv' \
+        "$ralsei_manifest")" || die "could not read the Ralsei output records"
+
+    ralsei_manifest_sha="$(sha "$ralsei_manifest")"
+    if ((verify_build_inputs)); then
+        importer_records="$(jq -er \
+            '.importer[] | [.rel, (.bytes | tostring), .sha256] | @tsv' \
+            "$ralsei_manifest")" || die "could not read the Ralsei importer lock"
+        while IFS=$'\t' read -r rel expected_bytes expected_sha; do
+            verify_file "$root/$rel" "$expected_sha" "$expected_bytes"
+        done <<<"$importer_records"
+        verify_file "$ralsei_archive" \
+            "$(jq -er '.archive.sha256' "$ralsei_manifest")" \
+            "$(jq -er '.archive.bytes' "$ralsei_manifest")"
+    fi
+}
+
 validate_audio_file() {
     local path=$1 probe actual_duration
     probe="$(ffprobe -v error \
@@ -414,7 +510,7 @@ validate_audio_file() {
 
 validate_existing_output() {
     local dir=$1 build_info generated_audio_sha generated_audio_bytes
-    local rel expected_bytes expected_sha first_audio=""
+    local rel expected_bytes expected_sha first_audio="" existing_output_records
 
     [[ -d "$dir" && ! -L "$dir" ]] ||
         die "existing output is not a regular directory: $dir"
@@ -424,15 +520,25 @@ validate_existing_output() {
     build_info="$(<"$dir/build-info.json")"
     jq -e \
         --arg build_id "$build_id" \
-        --argjson outputs "$expected_outputs_json" \
-        --argjson provenance "$expected_provenance_json" '
+        --argjson base_outputs "$expected_outputs_json" \
+        --argjson ralsei_outputs "$ralsei_expected_outputs_json" \
+        --argjson provenance "$expected_provenance_json" \
+        --argjson expected_variant "$ralsei_variant_json" '
         type == "object" and
-        (keys | sort) == [
-            "build_id", "built_at", "environment", "generated_audio",
-            "outputs", "provenance", "schema"
-        ] and
-        .schema == 2 and .build_id == $build_id and
-        .outputs == $outputs and .provenance == $provenance and
+        ((
+            (keys | sort) == [
+                "build_id", "built_at", "environment", "generated_audio",
+                "outputs", "provenance", "schema"
+            ] and .schema == 2 and .outputs == $base_outputs
+        ) or (
+            (keys | sort) == [
+                "build_id", "built_at", "environment", "generated_audio",
+                "outputs", "provenance", "schema", "variant"
+            ] and .schema == 3 and .variant == $expected_variant and
+            .outputs == $ralsei_outputs
+        )) and
+        .build_id == $build_id and
+        .provenance == $provenance and
         (.built_at | type == "string" and length > 0) and
         (.environment | type == "object" and
             (keys | sort) == ["dotnet", "ffmpeg", "wine"] and
@@ -448,9 +554,15 @@ validate_existing_output() {
     generated_audio_sha="$(jq -er '.generated_audio.sha256' <<<"$build_info")" ||
         die "could not read existing generated audio hash"
 
+    if [[ "$(jq -er '.schema' <<<"$build_info")" == 3 ]]; then
+        existing_output_records="$ralsei_expected_output_records"
+    else
+        existing_output_records="$output_records"
+    fi
+
     while IFS=$'\t' read -r rel expected_sha; do
         verify_file "$dir/$rel" "$expected_sha"
-    done <<<"$output_records"
+    done <<<"$existing_output_records"
     while IFS=$'\t' read -r rel expected_bytes expected_sha; do
         verify_file "$dir/$rel" "$expected_sha" "$expected_bytes"
     done <<<"$extra_records"
@@ -605,6 +717,25 @@ audio_outputs="$(jq -er '.audio.outputs[]' "$version_file")" || die "could not r
 expected_output_paths="$(jq -er '.deltarune.files[].rel, .output_extras[].rel, .audio.outputs[]' "$version_file")" ||
     die "could not read expected output paths"
 
+requested_outputs_json="$expected_outputs_json"
+requested_output_records="$output_records"
+load_ralsei_lock "$ralsei_enabled"
+ralsei_expected_outputs_json="$(jq -cn \
+    --argjson base "$expected_outputs_json" \
+    --argjson replacements "$ralsei_outputs_json" '
+    $base | map(. as $output |
+        ($replacements | map(select(.rel == $output.rel)) | first) as $replacement |
+        if $replacement == null then $output
+        else {rel: $output.rel, sha256: $replacement.sha256}
+        end)
+')" || die "could not create the Ralsei output bindings"
+ralsei_expected_output_records="$(jq -r '.[] | [.rel, .sha256] | @tsv' \
+    <<<"$ralsei_expected_outputs_json")" || die "could not create the Ralsei output records"
+if ((ralsei_enabled)); then
+    requested_outputs_json="$ralsei_expected_outputs_json"
+    requested_output_records="$ralsei_expected_output_records"
+fi
+
 note "Validating the clean game input"
 game_records="$(jq -er '.deltarune.files[] | [.rel, (.bytes|tostring), .sha256] | @tsv' "$version_file")" ||
     die "could not read locked game files"
@@ -637,11 +768,6 @@ if [[ -n "$patchset_dir" ]]; then
     paths_overlap "$patchset_dir" "$output_dir" && die "the patchset directory now overlaps the output directory"
     require_safe_repo_write_path "$patchset_dir" "the patchset directory"
     acquire_patchset_lock "$patchset_parent" "$(basename -- "$patchset_dir")"
-    if [[ -e "$patchset_dir" || -L "$patchset_dir" ]]; then
-        "$root/scripts/create_patchset.sh" \
-            --validate-only "$patchset_dir" \
-            --version-file "$version_file"
-    fi
 fi
 
 available_kib="$(df -Pk "$work_base" | awk 'NR==2 {print $4}')"
@@ -698,6 +824,13 @@ if [[ -n "$patchset_dir" ]]; then
     verify_manifest_members "$flips_dir" '.tools.flips.members'
     flips_binary="$flips_dir/flips"
     chmod u+x "$flips_binary"
+    if [[ -e "$patchset_dir" || -L "$patchset_dir" ]]; then
+        "$root/scripts/create_patchset.sh" \
+            --validate-only "$patchset_dir" \
+            --game-dir "$game_dir" \
+            --flips "$flips_binary" \
+            --version-file "$version_file"
+    fi
 fi
 
 keucher_adapter="$root/$keucher_adapter_rel"
@@ -827,7 +960,7 @@ note "Applying final coexistence hotfixes"
 "$root/scripts/apply_ch5_rhythm_evaluation_font_hotfix.sh" \
     "$staging_dir/chapter5_windows/data.win"
 
-note "Verifying the complete output"
+note "Verifying the complete base output"
 while IFS=$'\t' read -r rel expected_sha; do
     verify_file "$staging_dir/$rel" "$expected_sha"
 done <<<"$output_records"
@@ -842,28 +975,73 @@ cmp -s "$staging_dir/mus/ch5_intro_audio.ogg" \
 
 "$root/scripts/verify_merged_output.sh" "$staging_dir"
 
+if ((ralsei_enabled)); then
+    note "Importing the locked local Ralsei portrait replacement"
+    "$root/scripts/apply_ralsei_portraits.sh" \
+        --archive "$ralsei_archive" \
+        --output-dir "$staging_dir" \
+        --utmt "$utmt_dir/UndertaleModCli" \
+        --work-dir "$run_dir"
+
+    note "Verifying the complete Ralsei portrait variant"
+    while IFS=$'\t' read -r rel expected_bytes expected_sha; do
+        verify_file "$staging_dir/$rel" "$expected_sha" "$expected_bytes"
+    done <<<"$ralsei_output_records"
+    while IFS=$'\t' read -r rel expected_sha; do
+        verify_file "$staging_dir/$rel" "$expected_sha"
+    done <<<"$requested_output_records"
+    "$root/scripts/verify_merged_output.sh" "$staging_dir"
+fi
+
 build_info_tmp="$run_dir/build-info.json"
-jq -n \
-    --arg schema "2" \
-    --arg build_id "$build_id" \
-    --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    --arg dotnet "$(dotnet --version)" \
-    --arg wine "$(wine --version)" \
-    --arg ffmpeg "$(ffmpeg -version | head -n1)" \
-    --argjson provenance "$expected_provenance_json" \
-    --arg audio_sha256 "$(sha "$staging_dir/mus/ch5_intro_audio.ogg")" \
-    --argjson audio_bytes "$(stat -c %s "$staging_dir/mus/ch5_intro_audio.ogg")" \
-    --argjson outputs "$expected_outputs_json" \
-    '{schema: ($schema|tonumber), build_id: $build_id, built_at: $built_at,
-      provenance: $provenance,
-      environment: {dotnet: $dotnet, wine: $wine, ffmpeg: $ffmpeg},
-      outputs: $outputs,
-      generated_audio: {bytes: $audio_bytes, sha256: $audio_sha256}}' > "$build_info_tmp"
+if ((ralsei_enabled)); then
+    jq -n \
+        --argjson schema 3 \
+        --arg build_id "$build_id" \
+        --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg dotnet "$(dotnet --version)" \
+        --arg wine "$(wine --version)" \
+        --arg ffmpeg "$(ffmpeg -version | head -n1)" \
+        --argjson provenance "$expected_provenance_json" \
+        --argjson variant "$ralsei_variant_json" \
+        --arg audio_sha256 "$(sha "$staging_dir/mus/ch5_intro_audio.ogg")" \
+        --argjson audio_bytes "$(stat -c %s "$staging_dir/mus/ch5_intro_audio.ogg")" \
+        --argjson outputs "$requested_outputs_json" \
+        '{schema: $schema, build_id: $build_id, built_at: $built_at,
+          provenance: $provenance, variant: $variant,
+          environment: {dotnet: $dotnet, wine: $wine, ffmpeg: $ffmpeg},
+          outputs: $outputs,
+          generated_audio: {bytes: $audio_bytes, sha256: $audio_sha256}}' > "$build_info_tmp"
+else
+    jq -n \
+        --argjson schema 2 \
+        --arg build_id "$build_id" \
+        --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg dotnet "$(dotnet --version)" \
+        --arg wine "$(wine --version)" \
+        --arg ffmpeg "$(ffmpeg -version | head -n1)" \
+        --argjson provenance "$expected_provenance_json" \
+        --arg audio_sha256 "$(sha "$staging_dir/mus/ch5_intro_audio.ogg")" \
+        --argjson audio_bytes "$(stat -c %s "$staging_dir/mus/ch5_intro_audio.ogg")" \
+        --argjson outputs "$requested_outputs_json" \
+        '{schema: $schema, build_id: $build_id, built_at: $built_at,
+          provenance: $provenance,
+          environment: {dotnet: $dotnet, wine: $wine, ffmpeg: $ffmpeg},
+          outputs: $outputs,
+          generated_audio: {bytes: $audio_bytes, sha256: $audio_sha256}}' > "$build_info_tmp"
+fi
 mv "$build_info_tmp" "$staging_dir/build-info.json"
 
 verify_exact_output_tree "$staging_dir" "generated output contains a missing or unexpected tree entry"
 [[ "$(sha "$version_file")" == "$version_lock_sha" ]] ||
     die "version lock changed during the build"
+if ((ralsei_enabled)); then
+    [[ "$(sha "$ralsei_manifest")" == "$ralsei_manifest_sha" ]] ||
+        die "Ralsei portrait lock changed during the build"
+    verify_file "$ralsei_archive" \
+        "$(jq -er '.archive.sha256' "$ralsei_manifest")" \
+        "$(jq -er '.archive.bytes' "$ralsei_manifest")"
+fi
 while IFS=$'\t' read -r rel expected_bytes expected_sha; do
     verify_file "$game_dir/$rel" "$expected_sha" "$expected_bytes"
 done <<<"$game_records"
@@ -909,6 +1087,8 @@ if [[ -n "$patchset_dir" ]]; then
     if [[ -e "$patchset_dir" || -L "$patchset_dir" ]]; then
         "$root/scripts/create_patchset.sh" \
             --validate-only "$patchset_dir" \
+            --game-dir "$game_dir" \
+            --flips "$flips_binary" \
             --version-file "$version_file"
     fi
 fi

@@ -8,6 +8,7 @@ destination=""
 destination_argument=""
 validate_only=""
 version_file="$root/versions/pc-v0.0.247-f3437be-260710.json"
+ralsei_version_file="$root/versions/ralsei-portraits-samuton-v1.json"
 flips_argument=""
 flips_path=""
 staging=""
@@ -15,10 +16,18 @@ previous=""
 publish_lock_fd=""
 publish_lock_dir=""
 validation_tmp=""
+replay_tmp=""
+scratch_parent=""
 build_id=""
 expected_provenance=""
 expected_target_bindings=""
+expected_ralsei_target_bindings=""
+expected_ralsei_output_sizes=""
 expected_locked_extra_bindings=""
+ralsei_variant_json="null"
+selected_outputs_json=""
+patchset_schema=2
+patchset_variant_json="null"
 audio_outputs_json=""
 audio_codec=""
 audio_sample_rate=""
@@ -40,10 +49,15 @@ path to its rel. Verify all byte counts and SHA-256 values in manifest.json.
 
 Do not apply this patchset to a modified or different game version.'
 
+ralsei_patchset_notice='This schema 3 patchset also contains BPS output derived from the locally
+supplied asset ralsei-portraits-samuton-v1. Keep it only on the machine of the
+lawful asset holder. Do not commit, upload, publish, or redistribute this patchset.
+The source archive path and original PNG files are not included.'
+
 usage() {
     cat <<'EOF'
 Usage: scripts/create_patchset.sh --game-dir DIR --output-dir DIR --destination DIR [options]
-       scripts/create_patchset.sh --validate-only DIR [--version-file FILE]
+       scripts/create_patchset.sh --validate-only DIR --game-dir DIR [options]
 
 Create and verify a local vanilla-to-final BPS patchset plus all external files.
 The input directories are read-only. The destination is replaced only after every
@@ -52,7 +66,7 @@ patch has been decoded and verified.
 Options:
   --version-file FILE  Build version lock
   --flips FILE         Flips executable (default: resolve flips from PATH)
-  --validate-only DIR  Maintenance interface: only validate an existing patchset
+  --validate-only DIR  Validate and replay an existing patchset against --game-dir
   -h, --help           Show this help
 EOF
 }
@@ -71,6 +85,19 @@ hash_file() {
 paths_overlap() {
     local first=$1 second=$2
     [[ "$first" == "$second" || "$first" == "$second/"* || "$second" == "$first/"* ]]
+}
+
+prepare_scratch_parent() {
+    local candidate=${TMPDIR:-/tmp} protected
+    [[ -d "$candidate" && ! -L "$candidate" ]] ||
+        die "scratch parent is missing or unsafe: $candidate"
+    candidate="$(readlink -f -- "$candidate")"
+    for protected in "$@"; do
+        [[ -n "$protected" ]] || continue
+        [[ "$candidate" != "$protected" && "$candidate" != "$protected/"* ]] ||
+            die "scratch parent may not be inside a protected input: $candidate"
+    done
+    scratch_parent=$candidate
 }
 
 is_safe_relative_path() {
@@ -170,7 +197,8 @@ open_regular_file() {
 }
 
 file_descriptor_still_matches() {
-    local base=$1 rel=$2 fd=$3 path="$base/$rel" fd_path="/proc/$$/fd/$fd"
+    local base=$1 rel=$2 fd=$3
+    local path="$base/$rel" fd_path="/proc/$$/fd/$fd"
 
     [[ -f "$path" && ! -L "$path" &&
         "$(stat -Lc %h -- "$fd_path")" -eq 1 &&
@@ -287,6 +315,58 @@ validate_audio_file() {
     exec {fd}<&-
 }
 
+load_ralsei_metadata() {
+    local expected_inputs ralsei_json replacements
+
+    [[ -f "$ralsei_version_file" && ! -L "$ralsei_version_file" ]] ||
+        die "Ralsei portrait manifest is missing or unsafe: $ralsei_version_file"
+    ralsei_json="$(<"$ralsei_version_file")"
+    expected_inputs="$(jq -ce '[.deltarune.files[1:][] | {
+        chapter: .id, rel, input_sha256: .output_sha256
+    }]' "$version_file")" || die "could not read Ralsei input bindings"
+    jq -e --argjson expected_inputs "$expected_inputs" '
+        def exact($keys): type == "object" and (keys | sort) == ($keys | sort);
+        def positive_integer: type == "number" and isfinite and floor == . and . > 0;
+        def digest: type == "string" and test("^[0-9a-f]{64}$");
+        exact([
+            "schema", "id", "archive", "importer", "mapping_contract", "outputs", "files"
+        ]) and
+        .schema == 2 and .id == "ralsei-portraits-samuton-v1" and
+        (.archive | exact(["filename", "format", "bytes", "sha256"]) and
+            .format == "7z" and (.bytes | positive_integer) and (.sha256 | digest)) and
+        (.importer | type == "object") and
+        (.mapping_contract | type == "object") and (.files | type == "array") and
+        (.outputs | type == "array" and length == 5) and
+        all(.outputs[];
+            exact(["chapter", "rel", "input_bytes", "input_sha256", "bytes", "sha256"]) and
+            (.chapter | type == "string" and test("^ch[1-5]$")) and
+            (.rel | type == "string" and test("^chapter[1-5]_windows/data[.]win$")) and
+            (.input_bytes | positive_integer) and (.input_sha256 | digest) and
+            (.bytes | positive_integer) and (.sha256 | digest)) and
+        ([.outputs[] | {chapter, rel, input_sha256}] == $expected_inputs)
+    ' <<<"$ralsei_json" >/dev/null || die "invalid Ralsei portrait manifest"
+
+    ralsei_variant_json="$(jq -cn \
+        --argjson asset "$(jq -ce '{id, bytes: .archive.bytes, sha256: .archive.sha256}' \
+            <<<"$ralsei_json")" \
+        '{kind: "ralsei_portraits", asset: $asset}')" ||
+        die "could not create the Ralsei variant identity"
+    replacements="$(jq -ce '[.outputs[] | {rel, bytes, sha256}]' <<<"$ralsei_json")" ||
+        die "could not read Ralsei output bindings"
+    expected_ralsei_target_bindings="$(jq -cn \
+        --argjson base "$expected_target_bindings" \
+        --argjson replacements "$replacements" '
+        $base | map(. as $target |
+            ($replacements | map(select(.rel == $target.rel)) | first) as $replacement |
+            if $replacement == null then $target
+            else ($target + {output_sha256: $replacement.sha256})
+            end)
+    ')" || die "could not create Ralsei target bindings"
+    expected_ralsei_output_sizes="$(jq -c \
+        '[.outputs[] | {rel, output_bytes: .bytes}]' <<<"$ralsei_json")" ||
+        die "could not read Ralsei output sizes"
+}
+
 load_version_metadata() {
     local file_records extra_records audio_records
 
@@ -301,6 +381,7 @@ load_version_metadata() {
         id, rel, source_bytes: .bytes, source_sha256: .sha256,
         output_sha256: .output_sha256
     }]' "$version_file")" || die "could not read target bindings"
+    load_ralsei_metadata
     expected_locked_extra_bindings="$(jq -ce '[.output_extras[] | {
         rel, path: ("extras/" + .rel), bytes, sha256,
         origin: "locked_output_extra"
@@ -347,7 +428,7 @@ verify_patchset_tree() {
     local base=$1 description=${2:-patchset} manifest_json target_records derived_records extra_records
     local id rel patch source_bytes source_sha output_bytes output_sha patch_bytes patch_sha extra
     local operation source_target_id source_rel bytes sha path mode origin expected_rel
-    local readme_sha_line readme_sha readme_bytes kind entry parent entry_count=0
+    local readme_sha_line readme_sha readme_bytes expected_readme kind entry parent entry_count=0
     local -a expected_files=(manifest.json README.txt)
     local -A expected_entries=() seen_entries=()
     local -A target_rels=() target_bytes=() target_hashes=()
@@ -358,7 +439,9 @@ verify_patchset_tree() {
     read_regular_text_file "$base" manifest.json manifest_json ||
         die "$description has an unsafe or unreadable manifest.json"
 
-    jq -e --arg build_id "$build_id" --argjson provenance "$expected_provenance" '
+    jq -e --arg build_id "$build_id" \
+        --argjson provenance "$expected_provenance" \
+        --argjson expected_variant "$ralsei_variant_json" '
         def exact_keys($wanted):
             type == "object" and ((keys | sort) == ($wanted | sort));
         def positive_integer: type == "number" and . > 0 and floor == .;
@@ -370,11 +453,15 @@ verify_patchset_tree() {
             (test("[\\x00-\\x1f]") | not) and
             (split("/") | all(.[]; length > 0 and . != "." and . != ".."));
 
-        exact_keys([
+        ((exact_keys([
             "schema", "build_id", "created_at", "provenance",
             "targets", "derived_copies", "extras"
-        ]) and
-        .schema == 2 and .build_id == $build_id and .provenance == $provenance and
+        ]) and .schema == 2) or
+        (exact_keys([
+            "schema", "build_id", "created_at", "provenance", "variant",
+            "targets", "derived_copies", "extras"
+        ]) and .schema == 3 and .variant == $expected_variant)) and
+        .build_id == $build_id and .provenance == $provenance and
         (.created_at | type == "string" and
             test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")) and
         (.targets | type == "array" and length == 6) and
@@ -413,12 +500,20 @@ verify_patchset_tree() {
     ' <<<"$manifest_json" >/dev/null ||
         die "$description manifest schema, build id, or provenance is invalid"
 
-    jq -e --argjson expected "$expected_target_bindings" '
+    jq -e \
+        --argjson base "$expected_target_bindings" \
+        --argjson ralsei "$expected_ralsei_target_bindings" '
         [.targets[] | {
             id, rel, source_bytes, source_sha256, output_sha256
-        }] == $expected
+        }] == (if .schema == 3 then $ralsei else $base end)
     ' <<<"$manifest_json" >/dev/null ||
         die "$description targets do not match the version lock"
+    jq -e --argjson expected_sizes "$expected_ralsei_output_sizes" '
+        if .schema == 3 then
+            [.targets[1:][] | {rel, output_bytes}] == $expected_sizes
+        else true end
+    ' <<<"$manifest_json" >/dev/null ||
+        die "$description Ralsei target sizes do not match the portrait lock"
     jq -e --argjson expected "$expected_locked_extra_bindings" '
         [.extras[0:21][] | {rel, path, bytes, sha256, origin}] == $expected
     ' <<<"$manifest_json" >/dev/null ||
@@ -487,9 +582,13 @@ verify_patchset_tree() {
         validate_audio_file "$base" "extras/$rel"
     done
 
-    readme_sha_line="$(printf '%s\n' "$patchset_readme" | sha256sum)"
+    expected_readme="$patchset_readme"
+    if [[ "$(jq -er '.schema' <<<"$manifest_json")" == 3 ]]; then
+        expected_readme+=$'\n\n'"$ralsei_patchset_notice"
+    fi
+    readme_sha_line="$(printf '%s\n' "$expected_readme" | sha256sum)"
     readme_sha=${readme_sha_line%% *}
-    readme_bytes=$((${#patchset_readme} + 1))
+    readme_bytes=$((${#expected_readme} + 1))
     verify_regular_file "$base" README.txt "$readme_bytes" "$readme_sha"
 
     for entry in "${expected_files[@]}"; do
@@ -508,7 +607,8 @@ verify_patchset_tree() {
         done
     done
 
-    validation_tmp="$(mktemp "${TMPDIR:-/tmp}/dr-tas-chs-patchset-tree.XXXXXX")"
+    [[ -n "$scratch_parent" ]] || die "internal error: scratch parent was not prepared"
+    validation_tmp="$(mktemp "$scratch_parent/dr-tas-chs-patchset-tree.XXXXXX")"
     chmod 600 -- "$validation_tmp"
     find "$base" -mindepth 1 -printf '%y\0%P\0' >"$validation_tmp" ||
         die "could not enumerate $description"
@@ -531,6 +631,81 @@ verify_patchset_tree() {
         [[ -n "${seen_entries[$entry]+x}" ]] ||
             die "$description tree is missing an expected entry: $entry"
     done
+}
+
+replay_patchset_targets() {
+    local base=$1 description=${2:-patchset} manifest_json records
+    local id rel patch source_bytes source_sha output_bytes output_sha extra
+    local patch_fd source_fd patch_ref source_ref patch_magic replay_output
+
+    read_regular_text_file "$base" manifest.json manifest_json ||
+        die "$description has an unsafe or unreadable manifest.json"
+    records="$(jq -er '
+        .targets[] | [
+            .id, .rel, .patch, (.source_bytes | tostring), .source_sha256,
+            (.output_bytes | tostring), .output_sha256
+        ] | @tsv
+    ' <<<"$manifest_json")" || die "could not read $description replay records"
+
+    [[ -n "$scratch_parent" ]] || die "internal error: scratch parent was not prepared"
+    replay_tmp="$(mktemp -d "$scratch_parent/dr-tas-chs-patchset-replay.XXXXXX")"
+    chmod 700 -- "$replay_tmp"
+    while IFS=$'\t' read -r id rel patch source_bytes source_sha output_bytes output_sha extra; do
+        [[ -z "${extra:-}" ]] || die "$description contains an invalid replay record"
+        open_regular_file "$base" "$patch" patch_fd ||
+            die "$description patch is unsafe during replay: $patch"
+        open_regular_file "$game_dir" "$rel" source_fd ||
+            die "vanilla source is unsafe during replay: $rel"
+        patch_ref="/proc/$$/fd/$patch_fd"
+        source_ref="/proc/$$/fd/$source_fd"
+        IFS= read -r -N 4 patch_magic <"$patch_ref" ||
+            die "$description patch has a truncated header: $patch"
+        [[ "$patch_magic" == BPS1 ]] || die "$description patch is not BPS: $patch"
+        [[ "$(stat -Lc %s -- "$source_ref")" == "$source_bytes" &&
+            "$(hash_file "$source_ref")" == "$source_sha" ]] ||
+            die "vanilla source does not match $description: $rel"
+
+        replay_output="$replay_tmp/$id.win"
+        "$flips_path" --apply --exact "$patch_ref" "$source_ref" "$replay_output"
+        [[ -f "$replay_output" && ! -L "$replay_output" &&
+            "$(stat -c %h -- "$replay_output")" -eq 1 &&
+            "$(stat -c %s -- "$replay_output")" == "$output_bytes" &&
+            "$(hash_file "$replay_output")" == "$output_sha" ]] ||
+            die "$description BPS replay mismatch: $rel"
+        file_descriptor_still_matches "$base" "$patch" "$patch_fd" ||
+            die "$description patch changed during replay: $patch"
+        file_descriptor_still_matches "$game_dir" "$rel" "$source_fd" ||
+            die "vanilla source changed during replay: $rel"
+        exec {patch_fd}<&-
+        exec {source_fd}<&-
+        rm -f -- "$replay_output"
+    done <<<"$records"
+    safe_remove_tree "$replay_tmp" "$description replay directory" ||
+        die "could not remove $description replay directory"
+    replay_tmp=""
+}
+
+resolve_flips() {
+    local candidate expected_bytes expected_sha
+    if [[ -n "$flips_argument" ]]; then
+        candidate=$flips_argument
+    else
+        candidate="$(command -v flips || true)"
+        [[ -n "$candidate" ]] ||
+            die "Flips was not found; pass the verified executable with --flips FILE"
+    fi
+    [[ -f "$candidate" && ! -L "$candidate" && -x "$candidate" ]] ||
+        die "Flips is not a regular executable file: $candidate"
+    flips_path="$(readlink -f -- "$candidate")"
+    [[ -f "$flips_path" && ! -L "$flips_path" && -x "$flips_path" ]] ||
+        die "Flips is not a regular executable file: $flips_path"
+    expected_bytes="$(jq -er '.tools.flips.members[0].bytes' "$version_file")" ||
+        die "could not read the locked Flips size"
+    expected_sha="$(jq -er '.tools.flips.members[0].sha256' "$version_file")" ||
+        die "could not read the locked Flips hash"
+    [[ "$(stat -c %s -- "$flips_path")" == "$expected_bytes" &&
+        "$(hash_file "$flips_path")" == "$expected_sha" ]] ||
+        die "Flips executable does not match the version lock: $flips_path"
 }
 
 validate_lock_state() {
@@ -614,6 +789,33 @@ check_repository_destination() {
     fi
 }
 
+verify_build_output_tree() {
+    local base=$1 record id rel extra parent expected_tree actual_tree
+
+    expected_tree="$({
+        for record in "${files[@]}"; do
+            IFS=$'\t' read -r id rel extra <<<"$record"
+            printf '%s\n' "$rel"
+        done
+        for record in "${output_extras[@]}"; do
+            IFS=$'\t' read -r rel extra <<<"$record"
+            printf '%s\n' "$rel"
+        done
+        printf '%s\n' "${audio_outputs[@]}"
+        printf '%s\n' build-info.json
+    } | awk '
+        NF {
+            print "f " $0
+            path = $0
+            while (sub("/[^/]+$", "", path)) print "d " path
+        }
+    ' | LC_ALL=C sort -u)"
+    actual_tree="$(find "$base" -xdev -mindepth 1 -printf '%y %P\n' | LC_ALL=C sort)" ||
+        die "could not enumerate build output: $base"
+    [[ "$actual_tree" == "$expected_tree" ]] ||
+        die "build output contains a missing, unexpected, or unsafe tree entry: $base"
+}
+
 while (($#)); do
     case "$1" in
         --game-dir)
@@ -673,6 +875,10 @@ cleanup() {
             echo "warning: could not remove validation scratch file: $validation_tmp" >&2
         validation_tmp=""
     fi
+    if [[ -n "$replay_tmp" && ( -e "$replay_tmp" || -L "$replay_tmp" ) ]]; then
+        safe_remove_tree "$replay_tmp" "patchset replay directory" || true
+        replay_tmp=""
+    fi
     if [[ -n "$previous" && -e "$previous" ]]; then
         if [[ ! -e "$destination" && ! -L "$destination" ]]; then
             if mv -T -- "$previous" "$destination"; then
@@ -702,8 +908,11 @@ bash "$root/scripts/check_version_lock.sh" "$version_file" >/dev/null ||
 load_version_metadata
 
 if [[ -n "$validate_only" ]]; then
-    [[ -z "$game_dir" && -z "$output_dir" && -z "$destination" && -z "$flips_argument" ]] ||
-        die "--validate-only may only be combined with --version-file"
+    [[ -n "$game_dir" && -z "$output_dir" && -z "$destination" ]] ||
+        die "--validate-only requires --game-dir and may not use --output-dir or --destination"
+    [[ -d "$game_dir" && ! -L "$game_dir" ]] || die "game directory is missing or unsafe: $game_dir"
+    game_dir="$(readlink -f -- "$game_dir")"
+    resolve_flips
     [[ ! -L "$validate_only" ]] || die "patchset may not be a symbolic link: $validate_only"
     validate_name="$(basename -- "$(readlink -m -- "$validate_only")")"
     [[ -n "$validate_name" && "$validate_name" != . && "$validate_name" != .. &&
@@ -715,7 +924,9 @@ if [[ -n "$validate_only" ]]; then
     validate_only="${validate_parent%/}/$validate_name"
     [[ -d "$validate_only" && ! -L "$validate_only" ]] ||
         die "patchset is not a regular directory: $validate_only"
+    prepare_scratch_parent "$game_dir" "$validate_only" "$root"
     verify_patchset_tree "$validate_only" "patchset"
+    replay_patchset_targets "$validate_only" "patchset"
     echo "Patchset validation completed: $validate_only"
     exit 0
 fi
@@ -733,18 +944,7 @@ done
 game_dir="$(readlink -f -- "$game_dir")"
 output_dir="$(readlink -f -- "$output_dir")"
 
-if [[ -n "$flips_argument" ]]; then
-    flips_candidate=$flips_argument
-else
-    flips_candidate="$(command -v flips || true)"
-    [[ -n "$flips_candidate" ]] ||
-        die "Flips was not found; pass the verified executable with --flips FILE"
-fi
-[[ -f "$flips_candidate" && ! -L "$flips_candidate" && -x "$flips_candidate" ]] ||
-    die "Flips is not a regular executable file: $flips_candidate"
-flips_path="$(readlink -f -- "$flips_candidate")"
-[[ -f "$flips_path" && ! -L "$flips_path" && -x "$flips_path" ]] ||
-    die "Flips is not a regular executable file: $flips_path"
+resolve_flips
 
 destination_argument=$destination
 [[ ! -L "$destination_argument" ]] || die "destination may not be a symbolic link"
@@ -773,26 +973,40 @@ if [[ -e "$destination" || -L "$destination" ]]; then
         die "destination exists and is not a regular directory: $destination"
 fi
 
+prepare_scratch_parent "$game_dir" "$output_dir" "$destination" "$root"
+
 acquire_publish_lock
 if [[ -e "$destination" || -L "$destination" ]]; then
     verify_patchset_tree "$destination" "existing destination patchset"
+    replay_patchset_targets "$destination" "existing destination patchset"
 fi
 
 read_regular_text_file "$output_dir" build-info.json build_info_json ||
     die "missing or unsafe build metadata: $output_dir/build-info.json"
 expected_outputs="$(jq -ce '[.deltarune.files[] | {rel, sha256: .output_sha256}]' \
     "$version_file")" || die "could not read expected outputs"
+expected_ralsei_outputs="$(jq -c '[.[] | {rel, sha256: .output_sha256}]' \
+    <<<"$expected_ralsei_target_bindings")" || die "could not read Ralsei expected outputs"
 jq -e \
     --arg build_id "$build_id" \
     --argjson expected_outputs "$expected_outputs" \
+    --argjson ralsei_outputs "$expected_ralsei_outputs" \
+    --argjson expected_variant "$ralsei_variant_json" \
     --argjson expected_provenance "$expected_provenance" '
     type == "object" and
-    (keys | sort) == [
-        "build_id", "built_at", "environment", "generated_audio",
-        "outputs", "provenance", "schema"
-    ] and
-    .schema == 2 and .build_id == $build_id and
-    .outputs == $expected_outputs and .provenance == $expected_provenance and
+    ((
+        (keys | sort) == [
+            "build_id", "built_at", "environment", "generated_audio",
+            "outputs", "provenance", "schema"
+        ] and .schema == 2 and .outputs == $expected_outputs
+    ) or (
+        (keys | sort) == [
+            "build_id", "built_at", "environment", "generated_audio",
+            "outputs", "provenance", "schema", "variant"
+        ] and .schema == 3 and .outputs == $ralsei_outputs and
+        .variant == $expected_variant
+    )) and
+    .build_id == $build_id and .provenance == $expected_provenance and
     (.environment | type == "object" and
         (keys | sort) == ["dotnet", "ffmpeg", "wine"] and
         all(.[]; type == "string" and length > 0)) and
@@ -807,6 +1021,15 @@ generated_audio_bytes="$(jq -er '.generated_audio.bytes' <<<"$build_info_json")"
     die "could not read generated audio byte count"
 generated_audio_sha="$(jq -er '.generated_audio.sha256' <<<"$build_info_json")" ||
     die "could not read generated audio hash"
+patchset_schema="$(jq -er '.schema' <<<"$build_info_json")" ||
+    die "could not read output metadata schema"
+if [[ "$patchset_schema" == 3 ]]; then
+    patchset_variant_json="$(jq -c '.variant' <<<"$build_info_json")" ||
+        die "could not read output variant metadata"
+fi
+selected_outputs_json="$(jq -c '.outputs' <<<"$build_info_json")" ||
+    die "could not read selected output bindings"
+verify_build_output_tree "$output_dir"
 
 audio_codec="$(jq -er '.audio.codec' "$version_file")" || die "could not read audio codec"
 audio_sample_rate="$(jq -er '.audio.sample_rate' "$version_file")" ||
@@ -870,10 +1093,21 @@ for record in "${files[@]}"; do
 
     source="$game_dir/$rel"
     result="$output_dir/$rel"
+    output_sha="$(jq -er --arg rel "$rel" '
+        .[] | select(.rel == $rel) | .sha256
+    ' <<<"$selected_outputs_json")" || die "missing selected output binding: $rel"
     [[ "$(stat -c %s -- "$source")" == "$vanilla_bytes" &&
         "$(hash_file "$source")" == "$vanilla_sha" ]] || die "vanilla input mismatch: $rel"
     [[ "$(hash_file "$result")" == "$output_sha" ]] || die "built output mismatch: $rel"
     result_bytes="$(stat -c %s -- "$result")"
+    if [[ "$patchset_schema" == 3 && "$id" != main ]]; then
+        expected_result_bytes="$(jq -er --arg rel "$rel" '
+            .[] | select(.rel == $rel) | .output_bytes
+        ' <<<"$expected_ralsei_output_sizes")" ||
+            die "missing Ralsei output size binding: $rel"
+        [[ "$result_bytes" == "$expected_result_bytes" ]] ||
+            die "Ralsei output size mismatch: $rel"
+    fi
 
     patch_rel="patches/$id.bps"
     patch="$staging/$patch_rel"
@@ -888,7 +1122,7 @@ for record in "${files[@]}"; do
         "$(stat -c %s -- "$result")" == "$result_bytes" &&
         "$(hash_file "$result")" == "$output_sha" ]] ||
         die "an input changed while creating its patch: $rel"
-    rm -- "$verify"
+    rm -f -- "$verify"
 
     patch_bytes="$(stat -c %s -- "$patch")"
     patch_sha="$(hash_file "$patch")"
@@ -959,14 +1193,15 @@ jq -s '.' "$targets_jsonl" >"$staging/.targets.json"
 jq -s '.' "$extras_jsonl" >"$staging/.extras.json"
 jq -s '.' "$derived_jsonl" >"$staging/.derived-copies.json"
 jq -n \
-    --argjson schema 2 \
+    --argjson schema "$patchset_schema" \
     --arg build_id "$build_id" \
     --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --argjson provenance "$expected_provenance" \
+    --argjson variant "$patchset_variant_json" \
     --slurpfile targets "$staging/.targets.json" \
     --slurpfile extras "$staging/.extras.json" \
     --slurpfile derived_copies "$staging/.derived-copies.json" '
-    {
+    ({
         schema: $schema,
         build_id: $build_id,
         created_at: $created_at,
@@ -974,18 +1209,24 @@ jq -n \
         targets: $targets[0],
         derived_copies: $derived_copies[0],
         extras: $extras[0]
-    }
+    } + if $schema == 3 then {variant: $variant} else {} end)
 ' >"$staging/manifest.json"
-rm -- "$targets_jsonl" "$extras_jsonl" "$derived_jsonl" \
+rm -f -- "$targets_jsonl" "$extras_jsonl" "$derived_jsonl" \
     "$staging/.targets.json" "$staging/.extras.json" "$staging/.derived-copies.json"
 
-printf '%s\n' "$patchset_readme" >"$staging/README.txt"
+if [[ "$patchset_schema" == 3 ]]; then
+    printf '%s\n\n%s\n' "$patchset_readme" "$ralsei_patchset_notice" >"$staging/README.txt"
+else
+    printf '%s\n' "$patchset_readme" >"$staging/README.txt"
+fi
 verify_patchset_tree "$staging" "generated patchset"
+replay_patchset_targets "$staging" "generated patchset"
 
 if [[ -e "$destination" || -L "$destination" ]]; then
     [[ -d "$destination" && ! -L "$destination" ]] ||
         die "destination changed to an unsafe file before publication: $destination"
     verify_patchset_tree "$destination" "existing destination patchset"
+    replay_patchset_targets "$destination" "existing destination patchset"
     [[ ! -e "$previous" && ! -L "$previous" ]] ||
         die "temporary previous-patchset path already exists: $previous"
     mv -T -- "$destination" "$previous"

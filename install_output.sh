@@ -3,15 +3,24 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 version_file="$root/versions/pc-v0.0.247-f3437be-260710.json"
+ralsei_version_file="$root/versions/ralsei-portraits-samuton-v1.json"
 
 declare -a data_rels=()
 declare -a vanilla_hashes=()
 declare -a merged_hashes=()
+declare -a ralsei_hashes=()
+declare -a ralsei_bytes=()
+declare -a selected_hashes=()
+declare -a selected_bytes=()
 declare -a external_rels=()
 declare -a external_bytes=()
 declare -a external_hashes=()
 declare -a expected_backup_rels=()
 declare -a expected_backup_hashes=()
+declare -a expected_backup_ralsei_hashes=()
+declare -a expected_output_rels=()
+ralsei_variant_json="null"
+ralsei_expected_outputs_json=""
 build_id=""
 game_version=""
 version_json=""
@@ -107,6 +116,31 @@ destination_parent_is_safe() {
   done
 }
 
+destination_parent_is_safe_or_missing() {
+  local game="$1"
+  local rel="$2"
+  local parent component accumulated=""
+  local -a components=()
+
+  parent="${rel%/*}"
+  [ "$parent" != "$rel" ] || return 0
+  IFS='/' read -r -a components <<<"$parent"
+  for component in "${components[@]}"; do
+    if [ -n "$accumulated" ]; then
+      accumulated+="/$component"
+    else
+      accumulated="$component"
+    fi
+    if [ -L "$game/$accumulated" ]; then
+      return 1
+    elif [ -e "$game/$accumulated" ]; then
+      [ -d "$game/$accumulated" ] || return 1
+    else
+      return 0
+    fi
+  done
+}
+
 source_path_is_safe() {
   local source_root="$1"
   local rel="$2"
@@ -138,9 +172,71 @@ canonical_dir() {
 
 require_commands() {
   local command
-  for command in sha256sum cp find git mv mkdir mktemp date stat rm rmdir; do
+  for command in sha256sum cp find git ln mv mkdir mktemp date stat rm rmdir; do
     command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
   done
+}
+
+load_ralsei_version_manifest() {
+  local ralsei_json expected_inputs base_outputs records_text record
+
+  [ -f "$ralsei_version_file" ] && [ ! -L "$ralsei_version_file" ] ||
+    die "missing Ralsei portrait manifest: $ralsei_version_file"
+  ralsei_json="$(<"$ralsei_version_file")"
+  expected_inputs="$(jq -ce '[.deltarune.files[1:][] | {
+      chapter: .id, rel, input_sha256: .output_sha256
+    }]' <<<"$version_json")" || die "could not read Ralsei input bindings"
+  jq -e --argjson expected_inputs "$expected_inputs" '
+    def exact($keys): type == "object" and (keys | sort) == ($keys | sort);
+    def positive_integer: type == "number" and isfinite and floor == . and . > 0;
+    def digest: type == "string" and test("^[0-9a-f]{64}$");
+    exact([
+      "schema", "id", "archive", "importer", "mapping_contract", "outputs", "files"
+    ]) and
+    .schema == 2 and .id == "ralsei-portraits-samuton-v1" and
+    (.archive | exact(["filename", "format", "bytes", "sha256"]) and
+      .format == "7z" and (.bytes | positive_integer) and (.sha256 | digest)) and
+    (.importer | type == "object") and
+    (.mapping_contract | type == "object") and (.files | type == "array") and
+    (.outputs | type == "array" and length == 5) and
+    all(.outputs[];
+      exact(["chapter", "rel", "input_bytes", "input_sha256", "bytes", "sha256"]) and
+      (.chapter | type == "string" and test("^ch[1-5]$")) and
+      (.rel | type == "string" and test("^chapter[1-5]_windows/data[.]win$")) and
+      (.input_bytes | positive_integer) and (.input_sha256 | digest) and
+      (.bytes | positive_integer) and (.sha256 | digest)) and
+    ([.outputs[] | {chapter, rel, input_sha256}] == $expected_inputs)
+  ' <<<"$ralsei_json" >/dev/null || die "invalid Ralsei portrait manifest"
+
+  ralsei_variant_json="$(jq -cn \
+    --argjson asset "$(jq -ce '{id, bytes: .archive.bytes, sha256: .archive.sha256}' \
+      <<<"$ralsei_json")" \
+    '{kind: "ralsei_portraits", asset: $asset}')" ||
+    die "could not create the Ralsei variant identity"
+  base_outputs="$(jq -ce '[.deltarune.files[] | {rel, sha256: .output_sha256}]' \
+    <<<"$version_json")" || die "could not read base output bindings"
+  ralsei_expected_outputs_json="$(jq -cn \
+    --argjson base "$base_outputs" \
+    --argjson replacements "$(jq -ce '[.outputs[] | {rel, bytes, sha256}]' \
+      <<<"$ralsei_json")" '
+    $base | map(. as $output |
+      ($replacements | map(select(.rel == $output.rel)) | first) as $replacement |
+      if $replacement == null then $output
+      else {rel: $output.rel, sha256: $replacement.sha256}
+      end)
+  ')" || die "could not create the Ralsei output bindings"
+
+  ralsei_hashes=("${merged_hashes[0]}")
+  ralsei_bytes=("-")
+  records_text="$(jq -er '.outputs[] | [(.bytes | tostring), .sha256] | @tsv' \
+    <<<"$ralsei_json")" || die "could not read Ralsei output records"
+  while IFS=$'\t' read -r bytes hash extra; do
+    [ -z "${extra:-}" ] || die "invalid Ralsei output record"
+    ralsei_bytes+=("$bytes")
+    ralsei_hashes+=("$hash")
+  done <<<"$records_text"
+  [ "${#ralsei_hashes[@]}" -eq 6 ] && [ "${#ralsei_bytes[@]}" -eq 6 ] ||
+    die "Ralsei portrait manifest must define five chapter outputs"
 }
 
 load_version_manifest() {
@@ -224,22 +320,32 @@ load_version_manifest() {
     external_hashes+=("$merged_hash")
   done
 
+  load_ralsei_version_manifest
+
   for index in "${!data_rels[@]}"; do
     expected_backup_rels+=("${data_rels[$index]}")
     expected_backup_hashes+=("${merged_hashes[$index]}")
+    expected_backup_ralsei_hashes+=("${ralsei_hashes[$index]}")
   done
   for index in 1 2 3 4 5; do
     expected_backup_rels+=("chapter${index}_windows/data_keucher.win")
     expected_backup_hashes+=("${merged_hashes[$index]}")
+    expected_backup_ralsei_hashes+=("${ralsei_hashes[$index]}")
   done
   for index in "${!external_rels[@]}"; do
     expected_backup_rels+=("${external_rels[$index]}")
     expected_backup_hashes+=("${external_hashes[$index]}")
+    expected_backup_ralsei_hashes+=("${external_hashes[$index]}")
   done
   while IFS= read -r rel; do
     expected_backup_rels+=("$rel")
     expected_backup_hashes+=("-")
+    expected_backup_ralsei_hashes+=("-")
   done < <(jq -er '.audio.outputs[]' <<<"$version_json")
+
+  mapfile -t expected_output_rels < <(jq -er '
+    .deltarune.files[].rel, .output_extras[].rel, .audio.outputs[]
+  ' <<<"$version_json")
 }
 
 add_target() {
@@ -380,9 +486,27 @@ check_destination_path() {
   fi
 }
 
+verify_exact_output_tree() {
+  local out="$1" expected_tree actual_tree
+  expected_tree="$({
+    printf '%s\n' "${expected_output_rels[@]}"
+    printf '%s\n' build-info.json
+  } | awk '
+    NF {
+      print "f " $0
+      path = $0
+      while (sub("/[^/]+$", "", path)) print "d " path
+    }
+  ' | LC_ALL=C sort -u)"
+  actual_tree="$(find "$out" -xdev -mindepth 1 -printf '%y %P\n' | LC_ALL=C sort)" ||
+    die "could not enumerate output directory: $out"
+  [ "$actual_tree" = "$expected_tree" ] ||
+    die "output contains a missing, unexpected, or unsafe tree entry: $out"
+}
+
 build_target_list() {
   local out="$1"
-  local index source rel expected_outputs expected_provenance build_info_json
+  local index source rel expected_outputs expected_provenance build_info_json schema
   local audio_records_text generated_audio_hash generated_audio_bytes canonical_audio=""
   local -a audio_rels=()
 
@@ -399,14 +523,23 @@ build_target_list() {
     }' <<<"$version_json")" || die "could not read expected build provenance"
   jq -e --arg build_id "$build_id" \
     --argjson expected_outputs "$expected_outputs" \
+    --argjson ralsei_outputs "$ralsei_expected_outputs_json" \
+    --argjson expected_variant "$ralsei_variant_json" \
     --argjson expected_provenance "$expected_provenance" '
     type == "object" and
-    (keys | sort) == [
-      "build_id", "built_at", "environment", "generated_audio",
-      "outputs", "provenance", "schema"
-    ] and
-    .schema == 2 and .build_id == $build_id and
-    .outputs == $expected_outputs and .provenance == $expected_provenance and
+    ((
+      (keys | sort) == [
+        "build_id", "built_at", "environment", "generated_audio",
+        "outputs", "provenance", "schema"
+      ] and .schema == 2 and .outputs == $expected_outputs
+    ) or (
+      (keys | sort) == [
+        "build_id", "built_at", "environment", "generated_audio",
+        "outputs", "provenance", "schema", "variant"
+      ] and .schema == 3 and .outputs == $ralsei_outputs and
+      .variant == $expected_variant
+    )) and
+    .build_id == $build_id and .provenance == $expected_provenance and
     (.built_at | type == "string" and length > 0) and
     (.environment | type == "object") and
     (.environment | keys | sort) == ["dotnet", "ffmpeg", "wine"] and
@@ -422,18 +555,33 @@ build_target_list() {
   generated_audio_bytes="$(jq -er '.generated_audio.bytes' <<<"$build_info_json")" ||
     die "could not read generated audio size"
 
+  schema="$(jq -er '.schema' <<<"$build_info_json")" ||
+    die "could not read output metadata schema"
+  if [ "$schema" = 3 ]; then
+    selected_hashes=("${ralsei_hashes[@]}")
+    selected_bytes=("${ralsei_bytes[@]}")
+  else
+    selected_hashes=("${merged_hashes[@]}")
+    selected_bytes=()
+    for index in "${!merged_hashes[@]}"; do
+      selected_bytes+=("-")
+    done
+  fi
+
   for index in "${!data_rels[@]}"; do
     source="$out/${data_rels[$index]}"
     source_path_is_safe "$out" "${data_rels[$index]}" ||
       die "missing or unsafe output file: $source"
-    add_target "${data_rels[$index]}" "$source" "${merged_hashes[$index]}"
+    add_target "${data_rels[$index]}" "$source" \
+      "${selected_hashes[$index]}" "${selected_bytes[$index]}"
   done
 
   for index in 1 2 3 4 5; do
     source_path_is_safe "$out" "chapter${index}_windows/data.win" ||
       die "missing or unsafe output file: $out/chapter${index}_windows/data.win"
     add_target "chapter${index}_windows/data_keucher.win" \
-      "$out/chapter${index}_windows/data.win" "${merged_hashes[$index]}"
+      "$out/chapter${index}_windows/data.win" \
+      "${selected_hashes[$index]}" "${selected_bytes[$index]}"
   done
 
   for index in "${!external_rels[@]}"; do
@@ -456,11 +604,12 @@ build_target_list() {
     fi
   done
   validate_audio_file "$canonical_audio"
+  verify_exact_output_tree "$out"
 }
 
 validate_game_data() {
   local game="$1"
-  local vanilla_count=0 merged_count=0 index actual
+  local vanilla_count=0 merged_count=0 ralsei_count=0 index actual
 
   for index in "${!data_rels[@]}"; do
     [ -f "$game/${data_rels[$index]}" ] && [ ! -L "$game/${data_rels[$index]}" ] ||
@@ -470,7 +619,13 @@ validate_game_data() {
       vanilla_count=$((vanilla_count + 1))
     elif [ "$actual" = "${merged_hashes[$index]}" ]; then
       merged_count=$((merged_count + 1))
-    else
+    fi
+    if [ "$actual" = "${ralsei_hashes[$index]}" ]; then
+      ralsei_count=$((ralsei_count + 1))
+    fi
+    if [ "$actual" != "${vanilla_hashes[$index]}" ] &&
+      [ "$actual" != "${merged_hashes[$index]}" ] &&
+      [ "$actual" != "${ralsei_hashes[$index]}" ]; then
       die "unknown game file: ${data_rels[$index]} (sha256 $actual)"
     fi
   done
@@ -478,9 +633,11 @@ validate_game_data() {
   if [ "$vanilla_count" -eq "${#data_rels[@]}" ]; then
     echo "game data: exact vanilla $game_version"
   elif [ "$merged_count" -eq "${#data_rels[@]}" ]; then
-    echo "game data: exact merged output"
+    echo "game data: exact base merged output"
+  elif [ "$ralsei_count" -eq "${#data_rels[@]}" ]; then
+    echo "game data: exact Ralsei portrait variant"
   else
-    die "game data files are a mixture of vanilla and merged versions; refusing to write"
+    die "game data files are a mixture of vanilla, base, or Ralsei variants; refusing to write"
   fi
 }
 
@@ -551,6 +708,101 @@ copy_file_atomically() {
   return 0
 }
 
+copy_backup_from_fd_atomically() {
+  local source_ref="$1"
+  local destination="$2"
+  local expected_mode="$3"
+  local expected_hash="$4"
+  local parent temp actual_hash actual_mode actual_links
+  parent="${destination%/*}"
+  mkdir -p -- "$parent" || return 1
+  [ -d "$parent" ] && [ ! -L "$parent" ] || return 1
+  [ ! -e "$destination" ] && [ ! -L "$destination" ] || return 1
+  temp="$(mktemp "$parent/.dr-tas-chs-backup.XXXXXX")" || return 1
+  if ! cp -aL -- "$source_ref" "$temp"; then
+    rm -f -- "$temp"
+    return 1
+  fi
+  if [ ! -f "$temp" ] || [ -L "$temp" ]; then
+    rm -f -- "$temp"
+    return 1
+  fi
+  actual_links="$(stat -c '%h' -- "$temp")" || {
+    rm -f -- "$temp"
+    return 1
+  }
+  actual_mode="$(stat -c '%a' -- "$temp")" || {
+    rm -f -- "$temp"
+    return 1
+  }
+  actual_hash="$(hash_file "$temp")" || {
+    rm -f -- "$temp"
+    return 1
+  }
+  if [ "$actual_links" -ne 1 ] || [ "$actual_mode" != "$expected_mode" ] ||
+    [ "$actual_hash" != "$expected_hash" ]; then
+    rm -f -- "$temp"
+    return 1
+  fi
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    rm -f -- "$temp"
+    return 1
+  fi
+  if ! mv -f -T -- "$temp" "$destination"; then
+    rm -f -- "$temp"
+    return 1
+  fi
+  [ -f "$destination" ] && [ ! -L "$destination" ] &&
+    [ "$(stat -c '%h' -- "$destination")" -eq 1 ] &&
+    [ "$(stat -c '%a' -- "$destination")" = "$expected_mode" ] &&
+    [ "$(hash_file "$destination")" = "$expected_hash" ]
+}
+
+open_regular_single_link() {
+  local path="$1" result_var="$2" opened_fd fd_ref path_identity fd_identity
+  [ -f "$path" ] && [ ! -L "$path" ] || return 1
+  exec {opened_fd}<"$path" || return 1
+  fd_ref="/proc/$$/fd/$opened_fd"
+  if [ ! -f "$fd_ref" ] || [ "$(stat -Lc '%h' -- "$fd_ref")" -ne 1 ]; then
+    exec {opened_fd}<&-
+    return 1
+  fi
+  path_identity="$(stat -Lc '%d:%i' -- "$path")" || {
+    exec {opened_fd}<&-
+    return 1
+  }
+  fd_identity="$(stat -Lc '%d:%i' -- "$fd_ref")" || {
+    exec {opened_fd}<&-
+    return 1
+  }
+  if [ "$path_identity" != "$fd_identity" ]; then
+    exec {opened_fd}<&-
+    return 1
+  fi
+  printf -v "$result_var" '%s' "$opened_fd"
+}
+
+file_descriptor_still_matches() {
+  local path="$1" fd="$2"
+  local fd_ref="/proc/$$/fd/$fd"
+  [ -f "$path" ] && [ ! -L "$path" ] && [ -f "$fd_ref" ] &&
+    [ "$(stat -Lc '%h' -- "$fd_ref")" -eq 1 ] &&
+    [ "$(stat -Lc '%d:%i' -- "$path")" = "$(stat -Lc '%d:%i' -- "$fd_ref")" ]
+}
+
+move_staged_file_atomically() {
+  local source="$1"
+  local destination="$2"
+  local parent
+  [ -f "$source" ] && [ ! -L "$source" ] && [ "$(stat -c '%h' -- "$source")" -eq 1 ] ||
+    return 1
+  parent="${destination%/*}"
+  mkdir -p -- "$parent" || return 1
+  [ -d "$parent" ] && [ ! -L "$parent" ] || return 1
+  [ "$(stat -c '%d' -- "$source")" = "$(stat -Lc '%d' -- "$parent")" ] || return 1
+  mv -f -T -- "$source" "$destination"
+}
+
 remove_created_dirs() {
   local game="$1"
   shift
@@ -566,7 +818,7 @@ remove_created_dirs() {
 
 rollback_apply() {
   local game="$1"
-  local index state rel current_hash
+  local index state rel current_hash rollback_source
   local rollback_failed=0
   echo "install failed; restoring the pre-install state" >&2
   for index in "${apply_written_indices[@]}"; do
@@ -579,6 +831,7 @@ rollback_apply() {
     fi
     case "$state" in
       existing)
+        rollback_source="$stage_dir/rollback/$rel"
         if [ -f "$game/$rel" ] && [ ! -L "$game/$rel" ]; then
           current_hash="$(hash_file "$game/$rel" 2>/dev/null)"
           if [ "$current_hash" != "${apply_original_hashes[$index]}" ] &&
@@ -587,12 +840,24 @@ rollback_apply() {
             rollback_failed=1
             continue
           fi
-        else
+        elif [ -e "$game/$rel" ] || [ -L "$game/$rel" ]; then
           echo "rollback preserved unexpected state for $rel" >&2
           rollback_failed=1
           continue
         fi
-        if ! copy_file_atomically "$backup_dir/files/$rel" "$game/$rel" ||
+        if [ -f "$game/$rel" ] && [ "$current_hash" = "${apply_original_hashes[$index]}" ]; then
+          continue
+        fi
+        if [ -f "$rollback_source" ] && [ ! -L "$rollback_source" ] &&
+          [ "$(hash_file "$rollback_source" 2>/dev/null)" = "${apply_original_hashes[$index]}" ]; then
+          if ! move_staged_file_atomically "$rollback_source" "$game/$rel" ||
+            [ "$(hash_file "$game/$rel" 2>/dev/null)" != "${apply_original_hashes[$index]}" ]; then
+            echo "rollback failed for $rel" >&2
+            rollback_failed=1
+          fi
+          continue
+        fi
+        if ! rm -f -- "$game/$rel" || ! copy_file_atomically "$backup_dir/files/$rel" "$game/$rel" ||
           [ "$(hash_file "$game/$rel" 2>/dev/null)" != "${apply_original_hashes[$index]}" ]; then
           echo "rollback failed for $rel" >&2
           rollback_failed=1
@@ -664,7 +929,7 @@ rollback_restore() {
         rollback_failed=1
         continue
       fi
-      if ! copy_file_atomically "$stage_dir/current/$rel" "$game/$rel" ||
+      if ! move_staged_file_atomically "$stage_dir/current/$rel" "$game/$rel" ||
         [ "$(hash_file "$game/$rel" 2>/dev/null)" != "${restore_current_hashes[$index]}" ]; then
         echo "restore rollback failed for $rel" >&2
         rollback_failed=1
@@ -698,6 +963,9 @@ on_exit() {
   set +e
   if [ "$status" -ne 0 ] && [ "$writes_started" -eq 1 ]; then
     if [ "$operation" = "apply" ]; then
+      if [ -n "$stage_dir" ] && [ -d "$stage_dir/files" ] && [ ! -L "$stage_dir/files" ]; then
+        rm -rf --one-file-system -- "$stage_dir/files"
+      fi
       rollback_apply "$active_game"
     elif [ "$operation" = "restore" ]; then
       rollback_restore "$active_game"
@@ -722,7 +990,7 @@ apply_output() {
   local game="$1"
   local out="$2"
   local index rel destination source expected actual state original_hash backup_umask
-  local all_installed=1
+  local all_installed=1 source_fd source_ref original_mode backup_target
 
   operation="apply"
   active_game="$game"
@@ -759,14 +1027,29 @@ apply_output() {
   for index in "${!target_rels[@]}"; do
     rel="${target_rels[$index]}"
     destination="$game/$rel"
+    destination_parent_is_safe_or_missing "$game" "$rel" ||
+      die "unsafe destination parent while creating backup: $rel"
+    if [ -L "$destination" ] || { [ -e "$destination" ] && [ ! -f "$destination" ]; }; then
+      die "destination changed to an unsafe file while creating backup: $rel"
+    fi
     if [ -f "$destination" ]; then
       state="existing"
-      original_hash="$(hash_file "$destination")"
-      mkdir -p -- "$backup_dir/files/$(relative_parent "$rel")"
-      cp -a -- "$destination" "$backup_dir/files/$rel"
-      chmod 600 -- "$backup_dir/files/$rel"
-      [ "$(hash_file "$backup_dir/files/$rel")" = "$original_hash" ] ||
-        die "backup verification failed: $rel"
+      open_regular_single_link "$destination" source_fd ||
+        die "destination changed while opening backup source: $rel"
+      source_ref="/proc/$$/fd/$source_fd"
+      original_hash="$(hash_file "$source_ref")"
+      original_mode="$(stat -Lc '%a' -- "$source_ref")"
+      backup_target="$backup_dir/files/$rel"
+      if ! copy_backup_from_fd_atomically \
+        "$source_ref" "$backup_target" "$original_mode" "$original_hash"; then
+        exec {source_fd}<&-
+        die "backup copy or verification failed: $rel"
+      fi
+      if ! file_descriptor_still_matches "$destination" "$source_fd"; then
+        exec {source_fd}<&-
+        die "destination changed while it was backed up: $rel"
+      fi
+      exec {source_fd}<&-
     else
       state="missing"
       original_hash="-"
@@ -820,7 +1103,14 @@ apply_output() {
         die "destination changed during install: $game/$rel"
     fi
     apply_written_indices+=("$index")
-    copy_file_atomically "$stage_dir/files/$rel" "$game/$rel" ||
+    if [ "${apply_states[$index]}" = "existing" ]; then
+      mkdir -p -- "$stage_dir/rollback/$(relative_parent "$rel")"
+      ln -- "$game/$rel" "$stage_dir/rollback/$rel" ||
+        die "could not link destination for rollback: $rel"
+      [ "$(hash_file "$stage_dir/rollback/$rel")" = "${apply_original_hashes[$index]}" ] ||
+        die "rollback link verification failed: $rel"
+    fi
+    move_staged_file_atomically "$stage_dir/files/$rel" "$game/$rel" ||
       die "could not atomically install file: $rel"
     actual="$(hash_file "$game/$rel")"
     [ "$actual" = "${target_hashes[$index]}" ] || die "installed file verification failed: $rel"
@@ -881,9 +1171,11 @@ load_and_validate_backup() {
   local game="$1"
   local backup="$2"
   local state original_hash installed_hash rel extra actual expected_count recorded_game
-  local recorded_build status index
+  local recorded_build status index base_expected ralsei_expected row_profile
+  local installed_profile=""
   local -A seen=()
   local -A expected_hash_by_rel=()
+  local -A expected_ralsei_hash_by_rel=()
   local -A dir_seen=()
   local count=0
 
@@ -917,6 +1209,7 @@ load_and_validate_backup() {
     die "backup target set does not match build $build_id"
   for index in "${!expected_backup_rels[@]}"; do
     expected_hash_by_rel["${expected_backup_rels[$index]}"]="${expected_backup_hashes[$index]}"
+    expected_ralsei_hash_by_rel["${expected_backup_rels[$index]}"]="${expected_backup_ralsei_hashes[$index]}"
   done
 
   while IFS=$'\t' read -r state original_hash installed_hash rel extra; do
@@ -926,9 +1219,27 @@ load_and_validate_backup() {
     [ -n "${expected_hash_by_rel[$rel]+x}" ] || die "unexpected path in backup: $rel"
     seen["$rel"]=1
     is_sha256 "$installed_hash" || die "invalid installed hash in backup: $rel"
-    [ "${expected_hash_by_rel[$rel]}" = "-" ] ||
-      [ "$installed_hash" = "${expected_hash_by_rel[$rel]}" ] ||
-      die "installed hash in backup does not match build $build_id: $rel"
+    base_expected="${expected_hash_by_rel[$rel]}"
+    ralsei_expected="${expected_ralsei_hash_by_rel[$rel]}"
+    row_profile=""
+    if [ "$base_expected" = "-" ] && [ "$ralsei_expected" = "-" ]; then
+      :
+    elif [ "$base_expected" = "$ralsei_expected" ]; then
+      [ "$installed_hash" = "$base_expected" ] ||
+        die "installed hash in backup does not match build $build_id: $rel"
+    elif [ "$installed_hash" = "$base_expected" ]; then
+      row_profile="base"
+    elif [ "$installed_hash" = "$ralsei_expected" ]; then
+      row_profile="ralsei_portraits"
+    else
+      die "installed hash in backup does not match a known build variant: $rel"
+    fi
+    if [ -n "$row_profile" ]; then
+      if [ -n "$installed_profile" ] && [ "$installed_profile" != "$row_profile" ]; then
+        die "backup contains a mixture of base and Ralsei portrait outputs"
+      fi
+      installed_profile="$row_profile"
+    fi
     case "$state" in
       existing)
         is_sha256 "$original_hash" || die "invalid original hash in backup: $rel"
@@ -952,6 +1263,7 @@ load_and_validate_backup() {
   done <"$backup/manifest.tsv"
   [ "$count" -eq "$expected_count" ] && [ "$count" -gt 0 ] ||
     die "backup target count mismatch"
+  [ -n "$installed_profile" ] || die "backup does not identify a known output variant"
   for rel in "${expected_backup_rels[@]}"; do
     [ -n "${seen[$rel]+x}" ] || die "backup is missing target: $rel"
   done
@@ -1096,7 +1408,7 @@ restore_backup() {
     case "${restore_actions[$index]}" in
       restore)
         restore_written_indices+=("$index")
-        copy_file_atomically "$stage_dir/original/$rel" "$game/$rel" ||
+        move_staged_file_atomically "$stage_dir/original/$rel" "$game/$rel" ||
           die "could not atomically restore file: $rel"
         [ "$(hash_file "$game/$rel")" = "${restore_original_hashes[$index]}" ] ||
           die "restored file verification failed: $rel"

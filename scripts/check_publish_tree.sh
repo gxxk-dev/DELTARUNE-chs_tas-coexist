@@ -21,7 +21,11 @@ while IFS= read -r -d '' file; do
       echo "blocked local asset path: $file" >&2
       fail=1
       ;;
-    *.win|*.bps|*.xdelta|*.mp4|*.ogg|*.wav|*.exe|*.dll|*.ttf|*.otf|*.zip|*.tar.gz|*.7z|*.rar)
+  esac
+
+  lowercase_file=${file,,}
+  case "$lowercase_file" in
+    *.win|*.bps|*.xdelta|*.mp4|*.ogg|*.wav|*.exe|*.dll|*.ttf|*.otf|*.zip|*.tar.gz|*.7z|*.rar|*.png|*.jpg|*.jpeg)
       echo "blocked binary asset: $file" >&2
       fail=1
       ;;
